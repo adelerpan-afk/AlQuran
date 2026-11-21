@@ -1,12 +1,14 @@
 import React from 'react';
-import { Check, CheckCircle2, Moon, Sun } from 'lucide-react';
+import { BookOpen, Check, CheckCircle2, Moon, Sun } from 'lucide-react';
 import { QARI_LIST, type QariId, type ReaderPreferences } from '../types/quran';
 import { PWAInstallButton } from './PWAInstallButton';
+import { TajwidText } from './TajwidText';
 
 interface SettingsViewProps {
   prefs: ReaderPreferences;
   onUpdatePrefs: (partial: Partial<ReaderPreferences>) => void;
   onSelectQari: (qariId: QariId) => void;
+  onOpenTajwidGuide?: () => void;
   compactMode?: boolean;
 }
 
@@ -14,6 +16,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   prefs,
   onUpdatePrefs,
   onSelectQari,
+  onOpenTajwidGuide,
   compactMode = false,
 }) => {
   return (
@@ -28,7 +31,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           className="font-arabic text-right text-zinc-900 dark:text-zinc-100 leading-[2.1]"
           style={{ fontSize: `${prefs.arabicFontSize}px` }}
         >
-          بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+          <TajwidText text="بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ" enabled={prefs.showTajwid} />
         </p>
         {prefs.showLatin && (
           <p
@@ -152,7 +155,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               className="w-5 h-5 accent-teal-700 dark:accent-teal-500 rounded cursor-pointer"
             />
           </label>
+          <label className="flex items-center justify-between min-h-[48px] cursor-pointer">
+            <span className="text-sm text-zinc-800 dark:text-zinc-200">
+              Warna Tajwid (Kode Warna)
+            </span>
+            <input
+              type="checkbox"
+              checked={prefs.showTajwid}
+              onChange={(e) => onUpdatePrefs({ showTajwid: e.target.checked })}
+              className="w-5 h-5 accent-teal-700 dark:accent-teal-500 rounded cursor-pointer"
+            />
+          </label>
         </div>
+
+        {onOpenTajwidGuide && (
+          <button
+            type="button"
+            onClick={onOpenTajwidGuide}
+            className="w-full min-h-[44px] px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs sm:text-sm font-medium text-teal-700 dark:text-teal-400 inline-flex items-center justify-center gap-2 transition-colors"
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Lihat Panduan Tajwid Warna Khusus</span>
+          </button>
+        )}
       </div>
 
       {/* Qari Selector */}

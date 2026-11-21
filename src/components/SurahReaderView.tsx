@@ -7,6 +7,7 @@ import {
   Check,
   Copy,
   Info,
+  Palette,
   Pause,
   Play,
   SlidersHorizontal,
@@ -23,6 +24,8 @@ import {
   type SurahDetail,
 } from '../types/quran';
 import { SettingsView } from './SettingsView';
+import { TajwidGuideModal } from './TajwidGuideModal';
+import { TajwidText } from './TajwidText';
 
 interface SurahReaderViewProps {
   surah: SurahDetail | null;
@@ -69,6 +72,7 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
 }) => {
   const [showInfo, setShowInfo] = useState(false);
   const [showDisplaySheet, setShowDisplaySheet] = useState(false);
+  const [showTajwidGuide, setShowTajwidGuide] = useState(false);
   const [copiedAyah, setCopiedAyah] = useState<number | null>(null);
   const ayahRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
@@ -84,12 +88,11 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
     return () => clearTimeout(timer);
   }, [surah?.nomor, focusAyahNumber, focusNonce]);
 
-  // Auto-scroll to currently playing ayah
+  // Auto-scroll to currently playing ayah (both single-ayah and full-surah modes)
   useEffect(() => {
     if (
       !surah ||
       !audioState.active ||
-      audioState.mode !== 'ayah' ||
       audioState.surahNumber !== surah.nomor ||
       !audioState.ayahNumber
     ) {
@@ -99,7 +102,7 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [audioState.active, audioState.mode, audioState.surahNumber, audioState.ayahNumber, surah?.nomor]);
+  }, [audioState.active, audioState.surahNumber, audioState.ayahNumber, surah?.nomor]);
 
   const handleCopyAyah = async (ayah: Ayat) => {
     if (!surah) return;
@@ -230,7 +233,29 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
             </select>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => onUpdatePrefs({ showTajwid: !prefs.showTajwid })}
+              aria-pressed={prefs.showTajwid}
+              className={`min-h-[42px] px-3 rounded-xl border text-xs font-medium inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
+                prefs.showTajwid
+                  ? 'border-teal-600/50 bg-teal-50 text-teal-800 dark:border-teal-500/50 dark:bg-teal-950/50 dark:text-teal-300'
+                  : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <Palette className="w-4 h-4" />
+              <span>{prefs.showTajwid ? 'Tajwid: On' : 'Tajwid: Off'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowTajwidGuide(true)}
+              className="min-h-[42px] px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+            >
+              <span>Panduan Tajwid</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setShowInfo(true)}
@@ -270,7 +295,7 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
             dir="rtl"
             className="font-arabic text-2xl sm:text-3xl text-zinc-900 dark:text-zinc-100"
           >
-            بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+            <TajwidText text="بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ" enabled={prefs.showTajwid} />
           </p>
         </div>
       )}
@@ -280,7 +305,6 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
         {surah.ayat.map((ayah) => {
           const isAyahPlaying =
             audioState.active &&
-            audioState.mode === 'ayah' &&
             audioState.surahNumber === surah.nomor &&
             audioState.ayahNumber === ayah.nomorAyat;
           const isFocused = focusAyahNumber === ayah.nomorAyat;
@@ -399,7 +423,7 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
                 className="font-arabic text-right text-zinc-900 dark:text-zinc-100 leading-[2.25] tracking-normal"
                 style={{ fontSize: `${prefs.arabicFontSize}px` }}
               >
-                {ayah.teksArab}
+                <TajwidText text={ayah.teksArab} enabled={prefs.showTajwid} />
               </p>
 
               {/* Latin Transliteration */}
@@ -533,11 +557,23 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
               prefs={prefs}
               onUpdatePrefs={onUpdatePrefs}
               onSelectQari={onSelectQari}
+              onOpenTajwidGuide={() => {
+                setShowDisplaySheet(false);
+                setShowTajwidGuide(true);
+              }}
               compactMode
             />
           </div>
         </div>
       )}
+
+      {/* Panduan Tajwid Warna Khusus Modal */}
+      <TajwidGuideModal
+        open={showTajwidGuide}
+        tajwidEnabled={prefs.showTajwid}
+        onToggleTajwid={(enabled) => onUpdatePrefs({ showTajwid: enabled })}
+        onClose={() => setShowTajwidGuide(false)}
+      />
     </div>
   );
 };

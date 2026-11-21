@@ -44,7 +44,9 @@ export const AudioMiniPlayer: React.FC<AudioMiniPlayerProps> = ({
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">
             {audioState.surahName} ·{' '}
-            {audioState.mode === 'surah' ? 'Surat Penuh' : `Ayat ${audioState.ayahNumber}`}
+            {audioState.mode === 'surah'
+              ? `Surat Penuh · Ayat ${audioState.ayahNumber ?? 1}/${audioState.totalAyahs}`
+              : `Ayat ${audioState.ayahNumber}`}
           </p>
           <div className="flex items-center gap-1.5 mt-0.5">
             <select
@@ -70,17 +72,15 @@ export const AudioMiniPlayer: React.FC<AudioMiniPlayerProps> = ({
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
-          {audioState.mode === 'ayah' && (
-            <button
-              type="button"
-              onClick={onPrevAyah}
-              disabled={!audioState.ayahNumber || audioState.ayahNumber <= 1}
-              aria-label="Ayat sebelumnya"
-              className="min-h-[40px] min-w-[36px] flex items-center justify-center rounded-lg text-zinc-600 dark:text-zinc-300 disabled:opacity-30 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-            >
-              <SkipBack className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onPrevAyah}
+            disabled={!audioState.ayahNumber || audioState.ayahNumber <= 1}
+            aria-label="Ayat sebelumnya"
+            className="min-h-[40px] min-w-[36px] flex items-center justify-center rounded-lg text-zinc-600 dark:text-zinc-300 disabled:opacity-30 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          >
+            <SkipBack className="w-4 h-4" />
+          </button>
 
           <button
             type="button"
@@ -97,19 +97,17 @@ export const AudioMiniPlayer: React.FC<AudioMiniPlayerProps> = ({
             )}
           </button>
 
-          {audioState.mode === 'ayah' && (
-            <button
-              type="button"
-              onClick={onNextAyah}
-              disabled={
-                !audioState.ayahNumber || audioState.ayahNumber >= audioState.totalAyahs
-              }
-              aria-label="Ayat berikutnya"
-              className="min-h-[40px] min-w-[36px] flex items-center justify-center rounded-lg text-zinc-600 dark:text-zinc-300 disabled:opacity-30 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-            >
-              <SkipForward className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onNextAyah}
+            disabled={
+              !audioState.ayahNumber || audioState.ayahNumber >= audioState.totalAyahs
+            }
+            aria-label="Ayat berikutnya"
+            className="min-h-[40px] min-w-[36px] flex items-center justify-center rounded-lg text-zinc-600 dark:text-zinc-300 disabled:opacity-30 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          >
+            <SkipForward className="w-4 h-4" />
+          </button>
 
           <button
             type="button"

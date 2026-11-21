@@ -67,6 +67,14 @@ export interface LastReadState {
   updatedAt: number;
 }
 
+export interface ReadingHistoryItem {
+  id: string;
+  surahNumber: number;
+  surahName: string;
+  ayahNumber: number;
+  timestamp: number;
+}
+
 export interface ReaderPreferences {
   theme: 'light' | 'dark';
   qariId: QariId;
@@ -74,6 +82,7 @@ export interface ReaderPreferences {
   latinFontSize: number;
   showLatin: boolean;
   showTranslation: boolean;
+  showTajwid: boolean;
 }
 
 export type AudioMode = 'ayah' | 'surah';

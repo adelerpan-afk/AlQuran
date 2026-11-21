@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Ayat, BookmarkItem, LastReadState, QariId, ReaderPreferences } from '../types/quran';
+import type {
+  Ayat,
+  BookmarkItem,
+  LastReadState,
+  QariId,
+  ReaderPreferences,
+  ReadingHistoryItem,
+} from '../types/quran';
 
 const PREFS_KEY = 'alquran_prefs_v1';
 const BOOKMARKS_KEY = 'alquran_bookmarks_v1';
 const LAST_READ_KEY = 'alquran_last_read_v1';
+const HISTORY_KEY = 'alquran_history_v1';
 
 const DEFAULT_PREFS: ReaderPreferences = {
   theme: 'light',
@@ -12,6 +20,7 @@ const DEFAULT_PREFS: ReaderPreferences = {
   latinFontSize: 15,
   showLatin: true,
   showTranslation: true,
+  showTajwid: true,
 };
 
 function readJson<T>(key: string, fallback: T): T {
@@ -57,7 +66,10 @@ export function useQuranStore() {
     }
   });
 
-  // Sync theme to <html> class & meta theme-color
+  const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>(() =>
+    readArray<ReadingHistoryItem>(HISTORY_KEY),
+  );
+
   useEffect(() => {
     const root = document.documentElement;
     if (prefs.theme === 'dark') {
@@ -95,6 +107,14 @@ export function useQuranStore() {
       // Ignore
     }
   }, [lastRead]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(readingHistory));
+    } catch {
+      // Ignore
+    }
+  }, [readingHistory]);
 
   const updatePrefs = useCallback((partial: Partial<ReaderPreferences>) => {
     setPrefs((prev) => ({ ...prev, ...partial }));
@@ -141,13 +161,50 @@ export function useQuranStore() {
     setBookmarks((prev) => prev.filter((b) => b.id !== id));
   }, []);
 
-  const markLastRead = useCallback((surahNumber: number, surahName: string, ayahNumber: number) => {
-    setLastRead({
-      surahNumber,
-      surahName,
-      ayahNumber,
-      updatedAt: Date.now(),
+  const pushHistory = useCallback((surahNumber: number, surahName: string, ayahNumber: number) => {
+    const now = Date.now();
+    setReadingHistory((prev) => {
+      const latest = prev[0];
+      // If the exact same surah & ayah was recorded very recently (within 5 minutes), just refresh timestamp
+      if (
+        latest &&
+        latest.surahNumber === surahNumber &&
+        latest.ayahNumber === ayahNumber &&
+        now - latest.timestamp < 5 * 60 * 1000
+      ) {
+        return [{ ...latest, timestamp: now }, ...prev.slice(1)];
+      }
+      const entry: ReadingHistoryItem = {
+        id: `${surahNumber}:${ayahNumber}:${now}`,
+        surahNumber,
+        surahName,
+        ayahNumber,
+        timestamp: now,
+      };
+      return [entry, ...prev].slice(0, 200);
     });
+  }, []);
+
+  const markLastRead = useCallback(
+    (surahNumber: number, surahName: string, ayahNumber: number) => {
+      const now = Date.now();
+      setLastRead({
+        surahNumber,
+        surahName,
+        ayahNumber,
+        updatedAt: now,
+      });
+      pushHistory(surahNumber, surahName, ayahNumber);
+    },
+    [pushHistory],
+  );
+
+  const removeHistoryItem = useCallback((id: string) => {
+    setReadingHistory((prev) => prev.filter((h) => h.id !== id));
+  }, []);
+
+  const clearHistory = useCallback(() => {
+    setReadingHistory([]);
   }, []);
 
   const isBookmarked = useCallback(
@@ -167,5 +224,9 @@ export function useQuranStore() {
     isBookmarked,
     lastRead,
     markLastRead,
+    pushHistory,
+    readingHistory,
+    removeHistoryItem,
+    clearHistory,
   };
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AudioState, QariId, SurahDetail } from '../types/quran';
+import type { AudioMode, AudioState, QariId, SurahDetail } from '../types/quran';
 
 const INITIAL_STATE: AudioState = {
   active: false,
@@ -18,6 +18,7 @@ const INITIAL_STATE: AudioState = {
 
 export function useAudioPlayer(defaultQariId: QariId) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const preloadRef = useRef<HTMLAudioElement | null>(null);
   const surahRef = useRef<SurahDetail | null>(null);
   const stateRef = useRef<AudioState>({ ...INITIAL_STATE, qariId: defaultQariId });
 
@@ -26,13 +27,35 @@ export function useAudioPlayer(defaultQariId: QariId) {
     qariId: defaultQariId,
   }));
 
-  const updateState = useCallback((updater: Partial<AudioState> | ((prev: AudioState) => AudioState)) => {
-    setState((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
-      stateRef.current = next;
-      return next;
-    });
-  }, []);
+  const updateState = useCallback(
+    (updater: Partial<AudioState> | ((prev: AudioState) => AudioState)) => {
+      setState((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
+        stateRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
+
+  const preloadNextAyah = useCallback(
+    (surah: SurahDetail, currentAyahNumber: number, qari: QariId) => {
+      const nextAyah = surah.ayat.find((a) => a.nomorAyat === currentAyahNumber + 1);
+      if (!nextAyah) return;
+      const nextUrl = nextAyah.audio[qari] || Object.values(nextAyah.audio)[0];
+      if (!nextUrl) return;
+      try {
+        if (!preloadRef.current) {
+          preloadRef.current = new Audio();
+        }
+        preloadRef.current.preload = 'auto';
+        preloadRef.current.src = nextUrl;
+      } catch {
+        // Ignore preload failures
+      }
+    },
+    [],
+  );
 
   const playUrl = useCallback(
     (url: string, meta: Partial<AudioState>) => {
@@ -71,8 +94,8 @@ export function useAudioPlayer(defaultQariId: QariId) {
     [updateState],
   );
 
-  const playAyah = useCallback(
-    (surah: SurahDetail, ayahNumber: number, qariOverride?: QariId) => {
+  const playAyahSequence = useCallback(
+    (surah: SurahDetail, ayahNumber: number, mode: AudioMode, qariOverride?: QariId) => {
       surahRef.current = surah;
       const qari = qariOverride ?? stateRef.current.qariId ?? defaultQariId;
       const targetAyah = surah.ayat.find((a) => a.nomorAyat === ayahNumber);
@@ -82,34 +105,32 @@ export function useAudioPlayer(defaultQariId: QariId) {
       if (!url) return;
 
       playUrl(url, {
-        mode: 'ayah',
+        mode,
         surahNumber: surah.nomor,
         surahName: surah.namaLatin,
         totalAyahs: surah.jumlahAyat,
         ayahNumber,
         qariId: qari,
       });
+
+      preloadNextAyah(surah, ayahNumber, qari);
     },
-    [defaultQariId, playUrl],
+    [defaultQariId, playUrl, preloadNextAyah],
   );
 
+  const playAyah = useCallback(
+    (surah: SurahDetail, ayahNumber: number, qariOverride?: QariId) => {
+      playAyahSequence(surah, ayahNumber, 'ayah', qariOverride);
+    },
+    [playAyahSequence],
+  );
+
+  // Play entire surah sequentially ayah-by-ayah so active ayah highlight stays 100% synced
   const playSurahFull = useCallback(
     (surah: SurahDetail, qariOverride?: QariId) => {
-      surahRef.current = surah;
-      const qari = qariOverride ?? stateRef.current.qariId ?? defaultQariId;
-      const url = surah.audioFull[qari] || Object.values(surah.audioFull)[0];
-      if (!url) return;
-
-      playUrl(url, {
-        mode: 'surah',
-        surahNumber: surah.nomor,
-        surahName: surah.namaLatin,
-        totalAyahs: surah.jumlahAyat,
-        ayahNumber: null,
-        qariId: qari,
-      });
+      playAyahSequence(surah, 1, 'surah', qariOverride);
     },
-    [defaultQariId, playUrl],
+    [playAyahSequence],
   );
 
   const togglePlayPause = useCallback(() => {
@@ -141,46 +162,44 @@ export function useAudioPlayer(defaultQariId: QariId) {
     updateState({ ...INITIAL_STATE, qariId: stateRef.current.qariId });
   }, [updateState]);
 
-  const seek = useCallback((time: number) => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = Math.max(0, Math.min(time, audioRef.current.duration || 0));
-    updateState({ currentTime: audioRef.current.currentTime });
-  }, [updateState]);
+  const seek = useCallback(
+    (time: number) => {
+      if (!audioRef.current) return;
+      audioRef.current.currentTime = Math.max(0, Math.min(time, audioRef.current.duration || 0));
+      updateState({ currentTime: audioRef.current.currentTime });
+    },
+    [updateState],
+  );
 
   const nextAyah = useCallback(() => {
     const s = stateRef.current;
     const surah = surahRef.current;
-    if (!surah || s.mode !== 'ayah' || s.ayahNumber === null) return;
+    if (!surah || s.ayahNumber === null) return;
     if (s.ayahNumber < surah.jumlahAyat) {
-      playAyah(surah, s.ayahNumber + 1, s.qariId);
+      playAyahSequence(surah, s.ayahNumber + 1, s.mode, s.qariId);
     }
-  }, [playAyah]);
+  }, [playAyahSequence]);
 
   const prevAyah = useCallback(() => {
     const s = stateRef.current;
     const surah = surahRef.current;
-    if (!surah || s.mode !== 'ayah' || s.ayahNumber === null) return;
+    if (!surah || s.ayahNumber === null) return;
     if (s.ayahNumber > 1) {
-      playAyah(surah, s.ayahNumber - 1, s.qariId);
+      playAyahSequence(surah, s.ayahNumber - 1, s.mode, s.qariId);
     }
-  }, [playAyah]);
+  }, [playAyahSequence]);
 
   const switchQari = useCallback(
     (newQariId: QariId) => {
       const s = stateRef.current;
       const surah = surahRef.current;
       updateState({ qariId: newQariId });
-      if (!s.active || !surah) return;
-      if (s.mode === 'surah') {
-        playSurahFull(surah, newQariId);
-      } else if (s.ayahNumber !== null) {
-        playAyah(surah, s.ayahNumber, newQariId);
-      }
+      if (!s.active || !surah || s.ayahNumber === null) return;
+      playAyahSequence(surah, s.ayahNumber, s.mode, newQariId);
     },
-    [playAyah, playSurahFull, updateState],
+    [playAyahSequence, updateState],
   );
 
-  // Wire HTMLAudioElement lifecycle listeners once
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio();
@@ -208,8 +227,8 @@ export function useAudioPlayer(defaultQariId: QariId) {
     const onEnded = () => {
       const s = stateRef.current;
       const surah = surahRef.current;
-      if (s.mode === 'ayah' && surah && s.ayahNumber !== null && s.ayahNumber < surah.jumlahAyat) {
-        playAyah(surah, s.ayahNumber + 1, s.qariId);
+      if (surah && s.ayahNumber !== null && s.ayahNumber < surah.jumlahAyat) {
+        playAyahSequence(surah, s.ayahNumber + 1, s.mode, s.qariId);
       } else {
         updateState({ isPlaying: false, currentTime: 0 });
       }
@@ -239,7 +258,7 @@ export function useAudioPlayer(defaultQariId: QariId) {
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
     };
-  }, [playAyah, updateState]);
+  }, [playAyahSequence, updateState]);
 
   useEffect(() => {
     return () => {

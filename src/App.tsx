@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Bookmark, BookOpen, Moon, Search, Settings, Sun } from 'lucide-react';
+import { BookOpen, History, Info, Moon, Search, Settings, Sun } from 'lucide-react';
 import { registerSW } from 'virtual:pwa-register';
+import { AboutView } from './components/AboutView';
 import { AudioMiniPlayer } from './components/AudioMiniPlayer';
 import { BookmarksView } from './components/BookmarksView';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -9,12 +10,14 @@ import { SearchView } from './components/SearchView';
 import { SettingsView } from './components/SettingsView';
 import { SurahListView } from './components/SurahListView';
 import { SurahReaderView } from './components/SurahReaderView';
+import { TajwidGuideModal } from './components/TajwidGuideModal';
+import { WelcomeScreen } from './components/WelcomeScreen';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useQuranStore } from './hooks/useQuranStore';
 import { fetchSurahDetail, fetchSurahList } from './services/quranApi';
 import type { QariId, SurahDetail, SurahSummary } from './types/quran';
 
-type TabKey = 'surat' | 'cari' | 'tersimpan' | 'pengaturan';
+type TabKey = 'surat' | 'cari' | 'tersimpan' | 'pengaturan' | 'tentang';
 
 export default function App() {
   const {
@@ -28,6 +31,10 @@ export default function App() {
     isBookmarked,
     lastRead,
     markLastRead,
+    pushHistory,
+    readingHistory,
+    removeHistoryItem,
+    clearHistory,
   } = useQuranStore();
 
   const {
@@ -42,6 +49,8 @@ export default function App() {
     switchQari,
   } = useAudioPlayer(prefs.qariId);
 
+  const [hasEntered, setHasEntered] = useState(false);
+  const [showTajwidGuide, setShowTajwidGuide] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('surat');
   const [mobileReading, setMobileReading] = useState(false);
 
@@ -49,8 +58,8 @@ export default function App() {
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
 
-  const [selectedSurahNumber, setSelectedSurahNumber] = useState<number>(() =>
-    lastRead?.surahNumber ?? 1,
+  const [selectedSurahNumber, setSelectedSurahNumber] = useState<number>(
+    () => lastRead?.surahNumber ?? 1,
   );
   const [focusAyahNumber, setFocusAyahNumber] = useState<number | null>(
     () => lastRead?.ayahNumber ?? null,
@@ -60,7 +69,6 @@ export default function App() {
   const [detailLoading, setDetailLoading] = useState(true);
   const [detailError, setDetailError] = useState<string | null>(null);
 
-  // Register PWA Service Worker (production) & clean up stale dev SW in dev mode
   useEffect(() => {
     if (import.meta.env.DEV) {
       if ('serviceWorker' in navigator) {
@@ -120,16 +128,25 @@ export default function App() {
     loadSurahDetail(selectedSurahNumber);
   }, [selectedSurahNumber, loadSurahDetail]);
 
-  const handleOpenSurah = useCallback((nomor: number, ayahNumber?: number) => {
-    setSelectedSurahNumber(nomor);
-    setFocusAyahNumber(ayahNumber ?? null);
-    setFocusNonce((n) => n + 1);
-    setMobileReading(true);
-    setActiveTab('surat');
-    if (!ayahNumber) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, []);
+  const handleOpenSurah = useCallback(
+    (nomor: number, ayahNumber?: number) => {
+      setSelectedSurahNumber(nomor);
+      setFocusAyahNumber(ayahNumber ?? null);
+      setFocusNonce((n) => n + 1);
+      setMobileReading(true);
+      setActiveTab('surat');
+
+      const matchedSurah = surahList.find((s) => s.nomor === nomor);
+      if (matchedSurah) {
+        pushHistory(nomor, matchedSurah.namaLatin, ayahNumber ?? 1);
+      }
+
+      if (!ayahNumber) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    },
+    [pushHistory, surahList],
+  );
 
   const handlePlaySearchResult = useCallback(
     async (surahNumber: number, ayahNumber: number) => {
@@ -139,13 +156,13 @@ export default function App() {
         setActiveSurah(detail);
         setFocusAyahNumber(ayahNumber);
         setFocusNonce((n) => n + 1);
+        pushHistory(surahNumber, detail.namaLatin, ayahNumber);
         playAyah(detail, ayahNumber, prefs.qariId);
       } catch {
-        // Fallback: open surah so error UI handles it
         handleOpenSurah(surahNumber, ayahNumber);
       }
     },
-    [handleOpenSurah, playAyah, prefs.qariId],
+    [handleOpenSurah, playAyah, prefs.qariId, pushHistory],
   );
 
   const handleSelectQari = useCallback(
@@ -156,11 +173,27 @@ export default function App() {
     [setQariId, switchQari],
   );
 
+  if (!hasEntered) {
+    return (
+      <WelcomeScreen
+        theme={prefs.theme}
+        lastRead={lastRead}
+        onToggleTheme={toggleTheme}
+        onEnter={() => setHasEntered(true)}
+        onResumeLastRead={(surahNum, ayahNum) => {
+          setHasEntered(true);
+          handleOpenSurah(surahNum, ayahNum);
+        }}
+      />
+    );
+  }
+
   const navItems: { key: TabKey; label: string; icon: typeof BookOpen }[] = [
     { key: 'surat', label: 'Surat', icon: BookOpen },
     { key: 'cari', label: 'Cari', icon: Search },
-    { key: 'tersimpan', label: 'Tersimpan', icon: Bookmark },
-    { key: 'pengaturan', label: 'Pengaturan', icon: Settings },
+    { key: 'tersimpan', label: 'Riwayat', icon: History },
+    { key: 'pengaturan', label: 'Setelan', icon: Settings },
+    { key: 'tentang', label: 'Tentang', icon: Info },
   ];
 
   const renderSidebarPanel = () => {
@@ -190,8 +223,11 @@ export default function App() {
           <BookmarksView
             lastRead={lastRead}
             bookmarks={bookmarks}
+            readingHistory={readingHistory}
             onOpenAyah={handleOpenSurah}
             onRemoveBookmark={removeBookmark}
+            onRemoveHistory={removeHistoryItem}
+            onClearHistory={clearHistory}
           />
         );
       case 'pengaturan':
@@ -200,8 +236,11 @@ export default function App() {
             prefs={prefs}
             onUpdatePrefs={updatePrefs}
             onSelectQari={handleSelectQari}
+            onOpenTajwidGuide={() => setShowTajwidGuide(true)}
           />
         );
+      case 'tentang':
+        return <AboutView />;
     }
   };
 
@@ -209,10 +248,8 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
       <OfflineIndicator />
 
-      {/* Top Navigation Bar (Compact 52px on Mobile, 3-Zone Contract on Desktop) */}
       <header className="sticky top-0 z-30 h-13 lg:h-15 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
         <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 flex items-center justify-between gap-8">
-          {/* Zone 1: Brand Wordmark */}
           <button
             type="button"
             onClick={() => {
@@ -221,10 +258,9 @@ export default function App() {
             }}
             className="text-base sm:text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100 whitespace-nowrap shrink-0 text-left"
           >
-            Al-Qur&apos;an Digital
+            Al-Qur&apos;an Jariyah
           </button>
 
-          {/* Zone 2: Concise Desktop Nav Links */}
           <nav className="hidden lg:flex items-center gap-6">
             {navItems.map((item) => {
               const active = activeTab === item.key;
@@ -245,7 +281,6 @@ export default function App() {
             })}
           </nav>
 
-          {/* Zone 3: Single Primary Utility Group (Install + Theme) */}
           <div className="flex items-center gap-1 shrink-0">
             <PWAInstallButton variant="compact" />
             <button
@@ -264,13 +299,11 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Content Area */}
       <main
         className={`flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6 ${
           audioState.active ? 'pb-40 lg:pb-24' : 'pb-24 lg:pb-12'
         }`}
       >
-        {/* Mobile Layout (< lg) */}
         <div className="lg:hidden">
           {mobileReading && activeTab === 'surat' ? (
             <SurahReaderView
@@ -301,7 +334,6 @@ export default function App() {
           )}
         </div>
 
-        {/* Desktop Two-Column Workspace (>= lg) */}
         <div className="hidden lg:grid lg:grid-cols-[380px_1fr] lg:gap-8 lg:items-start">
           <aside className="sticky top-21 max-h-[calc(100vh-6.5rem)] overflow-y-auto pr-1 pb-6">
             {renderSidebarPanel()}
@@ -334,7 +366,6 @@ export default function App() {
         </div>
       </main>
 
-      {/* Docked Audio Mini Player */}
       <AudioMiniPlayer
         audioState={audioState}
         onTogglePlayPause={togglePlayPause}
@@ -345,12 +376,18 @@ export default function App() {
         onSwitchQari={handleSelectQari}
       />
 
-      {/* Mobile Bottom Tab Bar (56px height, within 15% sticky cap) */}
+      <TajwidGuideModal
+        open={showTajwidGuide}
+        tajwidEnabled={prefs.showTajwid}
+        onToggleTajwid={(enabled) => updatePrefs({ showTajwid: enabled })}
+        onClose={() => setShowTajwidGuide(false)}
+      />
+
       <nav
         aria-label="Navigasi Utama"
         className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 pb-safe"
       >
-        <div className="grid grid-cols-4 h-14 items-center">
+        <div className="grid grid-cols-5 h-14 items-center">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = activeTab === item.key;
@@ -372,7 +409,7 @@ export default function App() {
                 }`}
               >
                 <Icon className={`w-5 h-5 ${active ? 'stroke-[2.2]' : 'stroke-[1.8]'}`} />
-                <span className="text-[10px] font-medium tracking-tight leading-none">
+                <span className="text-[10px] font-medium tracking-tight leading-none whitespace-nowrap">
                   {item.label}
                 </span>
               </button>

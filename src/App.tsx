@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BookOpen, History, Info, Moon, Search, Settings, Sun } from 'lucide-react';
+import { BookOpen, History, Info, Maximize2, Moon, Search, Settings, Sun } from 'lucide-react';
 import { registerSW } from 'virtual:pwa-register';
 import { AboutView } from './components/AboutView';
 import { AudioMiniPlayer } from './components/AudioMiniPlayer';
 import { BookmarksView } from './components/BookmarksView';
+import { FullScreenAyahOverlay } from './components/FullScreenAyahOverlay';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { SearchView } from './components/SearchView';
@@ -69,6 +70,11 @@ export default function App() {
   const [activeSurah, setActiveSurah] = useState<SurahDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [readerSelectedAyah, setReaderSelectedAyah] = useState<number | null>(
+    () => lastRead?.ayahNumber ?? null,
+  );
+  const [fullScreenOpen, setFullScreenOpen] = useState(false);
+  const [fullScreenAyah, setFullScreenAyah] = useState(1);
 
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -172,6 +178,80 @@ export default function App() {
       switchQari(qariId);
     },
     [setQariId, switchQari],
+  );
+
+  // Keep Full Screen ayah synced automatically with active audio playback
+  useEffect(() => {
+    if (
+      fullScreenOpen &&
+      activeSurah &&
+      audioState.active &&
+      audioState.surahNumber === activeSurah.nomor &&
+      audioState.ayahNumber
+    ) {
+      setFullScreenAyah(audioState.ayahNumber);
+    }
+  }, [
+    fullScreenOpen,
+    activeSurah?.nomor,
+    audioState.active,
+    audioState.surahNumber,
+    audioState.ayahNumber,
+  ]);
+
+  const handleOpenFullScreenManual = useCallback(() => {
+    if (!activeSurah) return;
+    let targetAyah = 1;
+    if (
+      audioState.active &&
+      audioState.surahNumber === activeSurah.nomor &&
+      audioState.ayahNumber
+    ) {
+      targetAyah = audioState.ayahNumber;
+    } else if (readerSelectedAyah) {
+      targetAyah = Math.min(Math.max(readerSelectedAyah, 1), activeSurah.jumlahAyat);
+    } else if (lastRead?.surahNumber === activeSurah.nomor) {
+      targetAyah = Math.min(Math.max(lastRead.ayahNumber, 1), activeSurah.jumlahAyat);
+    }
+    setFullScreenAyah(targetAyah);
+    setFullScreenOpen(true);
+  }, [
+    activeSurah,
+    audioState.active,
+    audioState.surahNumber,
+    audioState.ayahNumber,
+    readerSelectedAyah,
+    lastRead,
+  ]);
+
+  const handlePlaySurahFullScreen = useCallback(
+    (surah: SurahDetail) => {
+      const isAlreadySurahMode =
+        audioState.active &&
+        audioState.mode === 'surah' &&
+        audioState.surahNumber === surah.nomor;
+      if (isAlreadySurahMode) {
+        setFullScreenAyah(audioState.ayahNumber ?? 1);
+        setFullScreenOpen(true);
+        if (!audioState.isPlaying) {
+          togglePlayPause();
+        }
+        return;
+      }
+      playSurahFull(surah, prefs.qariId);
+      setFullScreenAyah(1);
+      setFullScreenOpen(true);
+    },
+    [
+      audioState.active,
+      audioState.mode,
+      audioState.surahNumber,
+      audioState.ayahNumber,
+      audioState.isPlaying,
+      playSurahFull,
+      prefs.qariId,
+      togglePlayPause,
+    ],
   );
 
   if (!hasEntered) {
@@ -286,6 +366,16 @@ export default function App() {
             <PWAInstallButton variant="compact" />
             <button
               type="button"
+              onClick={handleOpenFullScreenManual}
+              disabled={!activeSurah}
+              aria-label="Mode baca satu ayat layar penuh"
+              title="Baca layar penuh (1 ayat)"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:border-teal-600/50 hover:text-teal-700 dark:hover:text-teal-300 disabled:opacity-40 transition-colors"
+            >
+              <Maximize2 className="w-[18px] h-[18px]" />
+            </button>
+            <button
+              type="button"
               onClick={toggleTheme}
               aria-label={prefs.theme === 'dark' ? 'Aktifkan mode terang' : 'Aktifkan mode gelap'}
               className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -324,11 +414,13 @@ export default function App() {
               onRetry={() => loadSurahDetail(selectedSurahNumber)}
               onPlayAyah={(s, a) => playAyah(s, a, prefs.qariId)}
               onPlaySurahFull={(s) => playSurahFull(s, prefs.qariId)}
+              onPlaySurahFullScreen={handlePlaySurahFullScreen}
               onTogglePlayPause={togglePlayPause}
               onSelectQari={handleSelectQari}
               onUpdatePrefs={updatePrefs}
               onToggleBookmark={toggleBookmark}
               onMarkLastRead={markLastRead}
+              onSelectedAyahChange={setReaderSelectedAyah}
             />
           ) : (
             renderSidebarPanel()
@@ -357,24 +449,56 @@ export default function App() {
               onRetry={() => loadSurahDetail(selectedSurahNumber)}
               onPlayAyah={(s, a) => playAyah(s, a, prefs.qariId)}
               onPlaySurahFull={(s) => playSurahFull(s, prefs.qariId)}
+              onPlaySurahFullScreen={handlePlaySurahFullScreen}
               onTogglePlayPause={togglePlayPause}
               onSelectQari={handleSelectQari}
               onUpdatePrefs={updatePrefs}
               onToggleBookmark={toggleBookmark}
               onMarkLastRead={markLastRead}
+              onSelectedAyahChange={setReaderSelectedAyah}
             />
           </section>
         </div>
       </main>
 
-      <AudioMiniPlayer
+      {!fullScreenOpen && (
+        <AudioMiniPlayer
+          audioState={audioState}
+          onTogglePlayPause={togglePlayPause}
+          onStop={stop}
+          onSeek={seek}
+          onNextAyah={nextAyah}
+          onPrevAyah={prevAyah}
+          onSwitchQari={handleSelectQari}
+          onCycleRepeat={cycleRepeatMode}
+        />
+      )}
+
+      <FullScreenAyahOverlay
+        open={fullScreenOpen}
+        surah={activeSurah}
+        ayahNumber={fullScreenAyah}
+        prefs={prefs}
         audioState={audioState}
+        onClose={() => setFullScreenOpen(false)}
+        onNextAyah={() => {
+          if (!activeSurah) return;
+          if (audioState.active && audioState.surahNumber === activeSurah.nomor) {
+            nextAyah();
+          } else {
+            setFullScreenAyah((prev) => Math.min(prev + 1, activeSurah.jumlahAyat));
+          }
+        }}
+        onPrevAyah={() => {
+          if (!activeSurah) return;
+          if (audioState.active && audioState.surahNumber === activeSurah.nomor) {
+            prevAyah();
+          } else {
+            setFullScreenAyah((prev) => Math.max(prev - 1, 1));
+          }
+        }}
         onTogglePlayPause={togglePlayPause}
-        onStop={stop}
-        onSeek={seek}
-        onNextAyah={nextAyah}
-        onPrevAyah={prevAyah}
-        onSwitchQari={handleSelectQari}
+        onPlayAyah={(s, a) => playAyah(s, a, prefs.qariId)}
         onCycleRepeat={cycleRepeatMode}
       />
 

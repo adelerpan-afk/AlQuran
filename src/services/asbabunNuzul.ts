@@ -8,10 +8,16 @@ export async function loadAsbabunNuzulMap(): Promise<AsbabunNuzulMap> {
   if (!cachePromise) {
     cachePromise = fetch('/data/asbabun-nuzul.json')
       .then((res) => {
-        if (!res.ok) return {};
+        if (!res.ok) {
+          cachePromise = null;
+          return {};
+        }
         return res.json() as Promise<AsbabunNuzulMap>;
       })
-      .catch(() => ({}));
+      .catch(() => {
+        cachePromise = null;
+        return {};
+      });
   }
   return cachePromise;
 }

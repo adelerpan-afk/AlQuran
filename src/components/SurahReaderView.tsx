@@ -11,6 +11,7 @@ import {
   HelpCircle,
   ImageDown,
   List,
+  Maximize2,
   Pause,
   Play,
   ScrollText,
@@ -53,11 +54,13 @@ interface SurahReaderViewProps {
   onRetry: () => void;
   onPlayAyah: (surah: SurahDetail, ayahNumber: number) => void;
   onPlaySurahFull: (surah: SurahDetail) => void;
+  onPlaySurahFullScreen: (surah: SurahDetail) => void;
   onTogglePlayPause: () => void;
   onSelectQari: (qariId: QariId) => void;
   onUpdatePrefs: (partial: Partial<ReaderPreferences>) => void;
   onToggleBookmark: (surahNumber: number, surahName: string, ayah: Ayat) => void;
   onMarkLastRead: (surahNumber: number, surahName: string, ayahNumber: number) => void;
+  onSelectedAyahChange?: (ayahNumber: number | null) => void;
 }
 
 export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
@@ -75,11 +78,13 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
   onRetry,
   onPlayAyah,
   onPlaySurahFull,
+  onPlaySurahFullScreen,
   onTogglePlayPause,
   onSelectQari,
   onUpdatePrefs,
   onToggleBookmark,
   onMarkLastRead,
+  onSelectedAyahChange,
 }) => {
   const [showInfo, setShowInfo] = useState(false);
   const [showAudioControls, setShowAudioControls] = useState(false);
@@ -112,7 +117,9 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
   // Move highlight first when jumping to a surah/ayah, pause briefly, then smoothly scroll
   useEffect(() => {
     if (!surah) return;
-    setSelectedAyah(focusAyahNumber ?? null);
+    const nextSelected = focusAyahNumber ?? null;
+    setSelectedAyah(nextSelected);
+    onSelectedAyahChange?.(nextSelected);
     if (!focusAyahNumber) return;
     const timer = window.setTimeout(() => {
       const el = ayahRefs.current[focusAyahNumber];
@@ -121,7 +128,7 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
       }
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [surah?.nomor, focusAyahNumber, focusNonce]);
+  }, [surah?.nomor, focusAyahNumber, focusNonce, onSelectedAyahChange]);
 
   // Auto-scroll to currently playing ayah
   useEffect(() => {
@@ -142,6 +149,7 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
   const handleSelectAyah = (ayahNumber: number) => {
     if (window.getSelection()?.toString()) return;
     setSelectedAyah(ayahNumber);
+    onSelectedAyahChange?.(ayahNumber);
     if (selectTimerRef.current !== null) {
       window.clearTimeout(selectTimerRef.current);
     }
@@ -341,31 +349,41 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
                 </select>
               </div>
 
-              <div className="grid grid-cols-[1fr_auto] sm:flex sm:items-center gap-2">
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
                 <button
                   type="button"
                   onClick={() =>
                     isThisSurahFullActive ? onTogglePlayPause() : onPlaySurahFull(surah)
                   }
-                  className="min-h-[44px] px-4 rounded-xl bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors whitespace-nowrap shrink-0 active:scale-[0.99]"
+                  className="min-h-[44px] px-3 sm:px-4 rounded-xl bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-1.5 sm:gap-2 transition-colors whitespace-nowrap shrink-0 active:scale-[0.99]"
                 >
                   {isThisSurahFullPlaying ? (
                     <>
-                      <Pause className="w-4 h-4" />
+                      <Pause className="w-4 h-4 shrink-0" />
                       <span>Jeda Surat</span>
                     </>
                   ) : (
                     <>
-                      <Play className="w-4 h-4" />
-                      <span>Putar Surat</span>
+                      <Play className="w-4 h-4 shrink-0" />
+                      <span>Putar Biasa</span>
                     </>
                   )}
                 </button>
 
                 <button
                   type="button"
+                  onClick={() => onPlaySurahFullScreen(surah)}
+                  className="min-h-[44px] px-3 sm:px-4 rounded-xl border border-teal-700/40 dark:border-teal-500/40 bg-teal-50 dark:bg-teal-950/50 hover:bg-teal-100/80 dark:hover:bg-teal-950 text-teal-800 dark:text-teal-200 text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-1.5 sm:gap-2 transition-colors whitespace-nowrap shrink-0 active:scale-[0.99]"
+                >
+                  <Maximize2 className="w-4 h-4 shrink-0" />
+                  <span className="sm:hidden">Full Screen</span>
+                  <span className="hidden sm:inline">Putar Full Screen</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setShowAudioControls(false)}
-                  className="min-h-[44px] px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+                  className="col-span-2 sm:col-span-1 min-h-[44px] px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
                 >
                   <ChevronUp className="w-4 h-4 shrink-0" />
                   <span>Sembunyikan</span>
@@ -503,23 +521,6 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
                     <Bookmark className={`w-4 h-4 ${bookmarked ? 'fill-current' : ''}`} />
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleExportPng(ayah);
-                    }}
-                    aria-label={`Simpan ayat ${ayah.nomorAyat} sebagai gambar PNG transparan`}
-                    title="Simpan sebagai PNG transparan"
-                    className="min-h-[40px] sm:min-h-[44px] min-w-[34px] sm:min-w-[42px] flex items-center justify-center rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                  >
-                    {exportedAyah === ayah.nomorAyat ? (
-                      <Check className="w-4 h-4 text-teal-700 dark:text-teal-400" />
-                    ) : (
-                      <ImageDown className="w-4 h-4" />
-                    )}
-                  </button>
-
                   {historyEntry && (
                     <button
                       type="button"
@@ -552,6 +553,23 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
                       <Check className="w-4 h-4 text-teal-700 dark:text-teal-400" />
                     ) : (
                       <Copy className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleExportPng(ayah);
+                    }}
+                    aria-label={`Simpan ayat ${ayah.nomorAyat} sebagai gambar PNG transparan`}
+                    title="Simpan sebagai PNG transparan"
+                    className="min-h-[40px] sm:min-h-[44px] min-w-[34px] sm:min-w-[42px] flex items-center justify-center rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    {exportedAyah === ayah.nomorAyat ? (
+                      <Check className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                    ) : (
+                      <ImageDown className="w-4 h-4" />
                     )}
                   </button>
                 </div>

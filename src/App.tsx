@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Bookmark, BookOpen, Moon, Search, Settings, Sun } from 'lucide-react';
 import { registerSW } from 'virtual:pwa-register';
 import { AudioMiniPlayer } from './components/AudioMiniPlayer';
@@ -11,8 +11,7 @@ import { SurahListView } from './components/SurahListView';
 import { SurahReaderView } from './components/SurahReaderView';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useQuranStore } from './hooks/useQuranStore';
-import { fetchSurahDetail, fetchSurahList, syncAllSurahs } from './services/quranApi';
-import { clearOfflineSurahCache, getCachedSurahKeys } from './services/quranDb';
+import { fetchSurahDetail, fetchSurahList } from './services/quranApi';
 import type { QariId, SurahDetail, SurahSummary } from './types/quran';
 
 type TabKey = 'surat' | 'cari' | 'tersimpan' | 'pengaturan';
@@ -61,11 +60,6 @@ export default function App() {
   const [detailLoading, setDetailLoading] = useState(true);
   const [detailError, setDetailError] = useState<string | null>(null);
 
-  const [cachedKeys, setCachedKeys] = useState<Set<number>>(new Set());
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState({ current: 0, total: 114 });
-  const syncAbortRef = useRef<AbortController | null>(null);
-
   // Register PWA Service Worker (production) & clean up stale dev SW in dev mode
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -92,12 +86,6 @@ export default function App() {
     }
   }, []);
 
-  const refreshCachedKeys = useCallback(async () => {
-    const keys = await getCachedSurahKeys();
-    setCachedKeys(new Set(keys));
-    setSyncProgress({ current: keys.length, total: 114 });
-  }, []);
-
   const loadSurahList = useCallback(async () => {
     setListLoading(true);
     setListError(null);
@@ -111,27 +99,22 @@ export default function App() {
     }
   }, []);
 
-  const loadSurahDetail = useCallback(
-    async (nomor: number) => {
-      setDetailLoading(true);
-      setDetailError(null);
-      try {
-        const detail = await fetchSurahDetail(nomor);
-        setActiveSurah(detail);
-        refreshCachedKeys();
-      } catch (err) {
-        setDetailError(err instanceof Error ? err.message : 'Gagal memuat isi surat.');
-      } finally {
-        setDetailLoading(false);
-      }
-    },
-    [refreshCachedKeys],
-  );
+  const loadSurahDetail = useCallback(async (nomor: number) => {
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      const detail = await fetchSurahDetail(nomor);
+      setActiveSurah(detail);
+    } catch (err) {
+      setDetailError(err instanceof Error ? err.message : 'Gagal memuat isi surat.');
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadSurahList();
-    refreshCachedKeys();
-  }, [loadSurahList, refreshCachedKeys]);
+  }, [loadSurahList]);
 
   useEffect(() => {
     loadSurahDetail(selectedSurahNumber);
@@ -173,27 +156,6 @@ export default function App() {
     [setQariId, switchQari],
   );
 
-  const handleStartSync = useCallback(async () => {
-    if (isSyncing) return;
-    const controller = new AbortController();
-    syncAbortRef.current = controller;
-    setIsSyncing(true);
-    try {
-      await syncAllSurahs((current, total) => {
-        setSyncProgress({ current, total });
-      }, controller.signal);
-    } finally {
-      setIsSyncing(false);
-      await refreshCachedKeys();
-    }
-  }, [isSyncing, refreshCachedKeys]);
-
-  const handleClearCache = useCallback(async () => {
-    if (isSyncing) return;
-    await clearOfflineSurahCache();
-    await refreshCachedKeys();
-  }, [isSyncing, refreshCachedKeys]);
-
   const navItems: { key: TabKey; label: string; icon: typeof BookOpen }[] = [
     { key: 'surat', label: 'Surat', icon: BookOpen },
     { key: 'cari', label: 'Cari', icon: Search },
@@ -211,7 +173,6 @@ export default function App() {
             error={listError}
             activeSurahNumber={selectedSurahNumber}
             lastRead={lastRead}
-            cachedSurahNumbers={cachedKeys}
             onSelectSurah={handleOpenSurah}
             onRetry={loadSurahList}
           />
@@ -220,10 +181,6 @@ export default function App() {
         return (
           <SearchView
             surahList={surahList}
-            cachedCount={cachedKeys.size}
-            isSyncing={isSyncing}
-            syncProgress={syncProgress}
-            onStartSync={handleStartSync}
             onOpenAyah={handleOpenSurah}
             onPlaySearchResult={handlePlaySearchResult}
           />
@@ -243,11 +200,6 @@ export default function App() {
             prefs={prefs}
             onUpdatePrefs={updatePrefs}
             onSelectQari={handleSelectQari}
-            cachedCount={cachedKeys.size}
-            isSyncing={isSyncing}
-            syncProgress={syncProgress}
-            onStartSync={handleStartSync}
-            onClearCache={handleClearCache}
           />
         );
     }

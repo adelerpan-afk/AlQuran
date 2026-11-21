@@ -10,10 +10,10 @@ export const OfflineIndicator: React.FC = () => {
   return (
     <div
       role="status"
-      className="bg-amber-50 dark:bg-amber-950/60 border-b border-amber-200 dark:border-amber-900/60 px-4 py-2 text-xs text-amber-900 dark:text-amber-200 flex items-center justify-center gap-2"
+      className="bg-amber-50 dark:bg-amber-950/60 border-b border-amber-200 dark:border-amber-900/60 px-4 py-2 text-xs text-amber-900 dark:text-amber-200 flex items-center justify-center gap-2 text-center"
     >
       <WifiOff className="w-3.5 h-3.5 shrink-0" />
-      <span>Mode Offline · Menampilkan surat yang tersimpan di perangkat.</span>
+      <span>Mode Offline · Bacaan & pencarian 114 surat tetap tersedia penuh.</span>
     </div>
   );
 };

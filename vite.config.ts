@@ -46,7 +46,8 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,json}'],
+          maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -77,26 +78,12 @@ export default defineConfig(() => {
               },
             },
             {
-              urlPattern: /^https:\/\/equran\.id\/api\/v2\/.*/i,
-              handler: 'StaleWhileRevalidate',
-              options: {
-                cacheName: 'equran-api-cache',
-                expiration: {
-                  maxEntries: 120,
-                  maxAgeSeconds: 60 * 60 * 24 * 30,
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
-            {
-              urlPattern: /^https:\/\/equran\.id\/audio.*/i,
+              urlPattern: /^https:\/\/(?:cdn\.)?equran\.id\/audio.*/i,
               handler: 'CacheFirst',
               options: {
                 cacheName: 'equran-audio-cache',
                 expiration: {
-                  maxEntries: 150,
+                  maxEntries: 200,
                   maxAgeSeconds: 60 * 60 * 24 * 30,
                 },
                 cacheableResponse: {

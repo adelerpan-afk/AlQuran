@@ -9,7 +9,6 @@ interface SurahListViewProps {
   error: string | null;
   activeSurahNumber: number | null;
   lastRead: LastReadState | null;
-  cachedSurahNumbers: Set<number>;
   onSelectSurah: (nomor: number, ayahNumber?: number) => void;
   onRetry: () => void;
 }
@@ -23,7 +22,6 @@ export const SurahListView: React.FC<SurahListViewProps> = ({
   error,
   activeSurahNumber,
   lastRead,
-  cachedSurahNumbers,
   onSelectSurah,
   onRetry,
 }) => {
@@ -228,7 +226,6 @@ export const SurahListView: React.FC<SurahListViewProps> = ({
         <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800/80 overflow-hidden">
           {filteredSurahs.map((surah) => {
             const isActive = activeSurahNumber === surah.nomor;
-            const isCached = cachedSurahNumbers.has(surah.nomor);
             return (
               <button
                 key={surah.nomor}
@@ -259,7 +256,6 @@ export const SurahListView: React.FC<SurahListViewProps> = ({
                     <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400 truncate">
                       {surah.arti} · {surah.tempatTurun} ·{' '}
                       <span className="tabular-nums">{surah.jumlahAyat}</span> Ayat
-                      {isCached ? ' · Offline' : ''}
                     </p>
                   </div>
                 </div>
@@ -348,7 +344,6 @@ export const SurahListView: React.FC<SurahListViewProps> = ({
                   <div className="bg-zinc-50/70 dark:bg-zinc-950/40 border-t border-zinc-100 dark:border-zinc-800/80 divide-y divide-zinc-100 dark:divide-zinc-800/70">
                     {entriesToShow.map((entry) => {
                       const isActive = activeSurahNumber === entry.surah.nomor;
-                      const isCached = cachedSurahNumbers.has(entry.surah.nomor);
                       return (
                         <button
                           key={`${group.juz}-${entry.surah.nomor}`}
@@ -371,7 +366,6 @@ export const SurahListView: React.FC<SurahListViewProps> = ({
                               <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate tabular-nums">
                                 Ayat {entry.startAyat}–{entry.endAyat}
                                 {entry.isPartial ? ' · Sebagian' : ''}
-                                {isCached ? ' · Offline' : ''}
                               </p>
                             </div>
                           </div>

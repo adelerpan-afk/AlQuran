@@ -1,14 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ArrowRight, DownloadCloud, Play, Search, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ArrowRight, Play, Search, X } from 'lucide-react';
 import { searchAyahs, type SearchScope } from '../services/quranApi';
 import type { SearchResultItem, SurahSummary } from '../types/quran';
 
 interface SearchViewProps {
   surahList: SurahSummary[];
-  cachedCount: number;
-  isSyncing: boolean;
-  syncProgress: { current: number; total: number };
-  onStartSync: () => void;
   onOpenAyah: (surahNumber: number, ayahNumber: number) => void;
   onPlaySearchResult: (surahNumber: number, ayahNumber: number) => void;
 }
@@ -22,10 +18,6 @@ const SCOPE_OPTIONS: { id: SearchScope; label: string }[] = [
 
 export const SearchView: React.FC<SearchViewProps> = ({
   surahList,
-  cachedCount,
-  isSyncing,
-  syncProgress,
-  onStartSync,
   onOpenAyah,
   onPlaySearchResult,
 }) => {
@@ -36,15 +28,6 @@ export const SearchView: React.FC<SearchViewProps> = ({
     null,
   );
   const [searching, setSearching] = useState(false);
-  const autoTriggeredRef = useRef(false);
-
-  // Trigger background indexing automatically once when user opens search and hasn't cached all 114 surahs
-  useEffect(() => {
-    if (cachedCount < 114 && !isSyncing && !autoTriggeredRef.current && navigator.onLine) {
-      autoTriggeredRef.current = true;
-      onStartSync();
-    }
-  }, [cachedCount, isSyncing, onStartSync]);
 
   useEffect(() => {
     let active = true;
@@ -64,13 +47,13 @@ export const SearchView: React.FC<SearchViewProps> = ({
         setResults(res.results);
         setSearching(false);
       }
-    }, 160);
+    }, 120);
 
     return () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [query, scope, surahList, cachedCount]);
+  }, [query, scope, surahList]);
 
   const highlightText = (text: string, q: string) => {
     const clean = q.trim();
@@ -142,37 +125,6 @@ export const SearchView: React.FC<SearchViewProps> = ({
         </div>
       </div>
 
-      {/* Offline Search Index Status */}
-      {cachedCount < 114 && (
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3.5 space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
-                {isSyncing
-                  ? `Menyiapkan indeks pencarian penuh (${syncProgress.current} / ${syncProgress.total} surat)...`
-                  : `Indeks pencarian tersimpan: ${cachedCount} dari 114 surat`}
-              </p>
-            </div>
-            {!isSyncing && (
-              <button
-                type="button"
-                onClick={onStartSync}
-                className="min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-xs font-medium shrink-0 transition-colors"
-              >
-                <DownloadCloud className="w-3.5 h-3.5" />
-                <span>Lengkapi</span>
-              </button>
-            )}
-          </div>
-          <div className="h-1.5 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-            <div
-              className="h-full bg-teal-700 dark:bg-teal-500 transition-all duration-300"
-              style={{ width: `${Math.round(((isSyncing ? syncProgress.current : cachedCount) / 114) * 100)}%` }}
-            />
-          </div>
-        </div>
-      )}
-
       {/* Direct Reference Jump Card */}
       {directJump && (
         <button
@@ -196,10 +148,10 @@ export const SearchView: React.FC<SearchViewProps> = ({
       {!query.trim() && (
         <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 space-y-3">
           <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-            Contoh Pencarian Cepat
+            Pencarian Instan 114 Surat (6.236 Ayat)
           </p>
           <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-            Ketik nomor surat dan ayat (mis. <span className="font-medium text-zinc-700 dark:text-zinc-300">2:255</span>), penggalan arti dalam bahasa Indonesia, tulisan Latin, atau lafaz Arab.
+            Ketik nomor surat dan ayat (mis. <span className="font-medium text-zinc-700 dark:text-zinc-300">2:255</span>), penggalan arti bahasa Indonesia, tulisan Latin, atau lafaz Arab. Seluruh pencarian berjalan lokal tanpa internet.
           </p>
           <div className="flex flex-wrap gap-2 pt-1">
             {['2:255', 'sabar', 'bersyukur', 'rahman', 'Al-Kahfi 10'].map((sample) => (
@@ -219,7 +171,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
       {/* Search Results */}
       {query.trim() && searching && (
         <p className="text-xs text-zinc-500 dark:text-zinc-400 px-1">
-          Mencari di {cachedCount} surat tersimpan...
+          Mencari di seluruh 114 surat...
         </p>
       )}
 
@@ -229,9 +181,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             Tidak ada ayat yang cocok
           </p>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            {cachedCount < 114
-              ? `Pencarian baru mencakup ${cachedCount}/114 surat. Tunggu sinkronisasi selesai atau coba kata kunci lain.`
-              : 'Coba gunakan kata kunci yang lebih singkat atau ganti cakupan pencarian.'}
+            Coba gunakan kata kunci yang lebih singkat atau ganti cakupan pencarian.
           </p>
         </div>
       )}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, DownloadCloud, Moon, Sun, Trash2 } from 'lucide-react';
+import { Check, CheckCircle2, Moon, Sun } from 'lucide-react';
 import { QARI_LIST, type QariId, type ReaderPreferences } from '../types/quran';
 import { PWAInstallButton } from './PWAInstallButton';
 
@@ -7,11 +7,6 @@ interface SettingsViewProps {
   prefs: ReaderPreferences;
   onUpdatePrefs: (partial: Partial<ReaderPreferences>) => void;
   onSelectQari: (qariId: QariId) => void;
-  cachedCount: number;
-  isSyncing: boolean;
-  syncProgress: { current: number; total: number };
-  onStartSync: () => void;
-  onClearCache: () => void;
   compactMode?: boolean;
 }
 
@@ -19,11 +14,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   prefs,
   onUpdatePrefs,
   onSelectQari,
-  cachedCount,
-  isSyncing,
-  syncProgress,
-  onStartSync,
-  onClearCache,
   compactMode = false,
 }) => {
   return (
@@ -201,57 +191,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       {!compactMode && (
         <>
-          {/* Offline Data Storage */}
-          <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 space-y-3">
+          {/* Local Dataset Info */}
+          <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 space-y-2.5">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                Penyimpanan Offline Al-Qur&apos;an
+                Data Al-Qur&apos;an Offline
               </span>
-              <span className="text-xs font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
-                {cachedCount} / 114 Surat
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium tabular-nums text-teal-700 dark:text-teal-400">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>114 Surat · 6.236 Ayat</span>
               </span>
             </div>
             <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-              Simpan seluruh teks Arab, Latin, dan Terjemahan 114 surat di perangkat agar tetap dapat dibaca serta dicari tanpa internet.
+              Seluruh teks Arab, tulisan Latin, dan terjemahan bahasa Indonesia tersimpan lokal di dalam aplikasi dan siap dibaca maupun dicari tanpa koneksi internet. Audio murottal diputar melalui jaringan dan tersimpan otomatis di cache setelah diputar.
             </p>
-
-            <div className="h-1.5 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-              <div
-                className="h-full bg-teal-700 dark:bg-teal-500 transition-all duration-300"
-                style={{
-                  width: `${Math.round(((isSyncing ? syncProgress.current : cachedCount) / 114) * 100)}%`,
-                }}
-              />
-            </div>
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              {cachedCount < 114 && (
-                <button
-                  type="button"
-                  onClick={onStartSync}
-                  disabled={isSyncing}
-                  className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 transition-colors"
-                >
-                  <DownloadCloud className="w-4 h-4" />
-                  <span>
-                    {isSyncing
-                      ? `Mengunduh (${syncProgress.current}/${syncProgress.total})...`
-                      : 'Unduh Semua Surat'}
-                  </span>
-                </button>
-              )}
-              {cachedCount > 0 && (
-                <button
-                  type="button"
-                  onClick={onClearCache}
-                  disabled={isSyncing}
-                  className="min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-medium px-3.5 py-2 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Bersihkan Cache</span>
-                </button>
-              )}
-            </div>
           </div>
 
           {/* PWA Install Section */}

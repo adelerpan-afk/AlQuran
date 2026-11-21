@@ -1,119 +1,157 @@
-import type { SearchResultItem, SurahDetail, SurahSummary } from '../types/quran';
-import {
-  getAllCachedSurahDetails,
-  getCachedSurahDetail,
-  getCachedSurahKeys,
-  getCachedSurahList,
-  saveSurahDetail,
-  saveSurahList,
-} from './quranDb';
+import type {
+  AudioMap,
+  QariId,
+  SearchResultItem,
+  SurahDetail,
+  SurahSummary,
+} from '../types/quran';
 
-const API_BASE = 'https://equran.id/api/v2';
+interface RawCompactAyat {
+  nomorAyat: number;
+  teksArab: string;
+  teksLatin: string;
+  teksIndonesia: string;
+}
 
-interface ApiResponse<T> {
-  code: number;
-  message: string;
-  data: T;
+interface RawCompactSurah {
+  nomor: number;
+  nama: string;
+  namaLatin: string;
+  jumlahAyat: number;
+  tempatTurun: string;
+  arti: string;
+  deskripsi: string;
+  ayat: RawCompactAyat[];
+}
+
+interface RawQuranDataset {
+  version: number;
+  source: string;
+  totalSurah: number;
+  totalAyat: number;
+  audioFullBases: Record<QariId, string>;
+  audioAyatBases: Record<QariId, string>;
+  surahs: RawCompactSurah[];
+}
+
+interface LoadedDataset {
+  summaries: SurahSummary[];
+  detailsByNomor: Map<number, SurahDetail>;
+  detailsList: SurahDetail[];
+}
+
+const QARI_IDS: QariId[] = ['01', '02', '03', '04', '05', '06'];
+
+let datasetPromise: Promise<LoadedDataset> | null = null;
+
+function buildAudioFull(bases: Record<QariId, string>, surahNomor: number): AudioMap {
+  const pad3 = String(surahNomor).padStart(3, '0');
+  const map = {} as AudioMap;
+  for (const id of QARI_IDS) {
+    map[id] = `${bases[id]}/${pad3}.mp3`;
+  }
+  return map;
+}
+
+function buildAudioAyat(
+  bases: Record<QariId, string>,
+  surahNomor: number,
+  ayahNomor: number,
+): AudioMap {
+  const sPad = String(surahNomor).padStart(3, '0');
+  const aPad = String(ayahNomor).padStart(3, '0');
+  const map = {} as AudioMap;
+  for (const id of QARI_IDS) {
+    map[id] = `${bases[id]}/${sPad}${aPad}.mp3`;
+  }
+  return map;
+}
+
+async function loadLocalDataset(): Promise<LoadedDataset> {
+  if (datasetPromise) return datasetPromise;
+
+  datasetPromise = (async () => {
+    const response = await fetch('/data/quran-full.json');
+    if (!response.ok) {
+      throw new Error('Gagal memuat bundel data Al-Qur\'an lokal.');
+    }
+    const raw = (await response.json()) as RawQuranDataset;
+    if (!Array.isArray(raw.surahs) || raw.surahs.length === 0) {
+      throw new Error('Format data Al-Qur\'an lokal tidak valid.');
+    }
+
+    const summaries: SurahSummary[] = raw.surahs.map((s) => ({
+      nomor: s.nomor,
+      nama: s.nama,
+      namaLatin: s.namaLatin,
+      jumlahAyat: s.jumlahAyat,
+      tempatTurun: s.tempatTurun,
+      arti: s.arti,
+      deskripsi: s.deskripsi,
+      audioFull: buildAudioFull(raw.audioFullBases, s.nomor),
+    }));
+
+    const detailsByNomor = new Map<number, SurahDetail>();
+    const detailsList: SurahDetail[] = [];
+
+    for (let i = 0; i < raw.surahs.length; i++) {
+      const s = raw.surahs[i];
+      const summary = summaries[i];
+      const prev = i > 0 ? summaries[i - 1] : null;
+      const next = i < summaries.length - 1 ? summaries[i + 1] : null;
+
+      const detail: SurahDetail = {
+        ...summary,
+        ayat: s.ayat.map((a) => ({
+          nomorAyat: a.nomorAyat,
+          teksArab: a.teksArab,
+          teksLatin: a.teksLatin,
+          teksIndonesia: a.teksIndonesia,
+          audio: buildAudioAyat(raw.audioAyatBases, s.nomor, a.nomorAyat),
+        })),
+        suratSebelumnya: prev
+          ? {
+              nomor: prev.nomor,
+              nama: prev.nama,
+              namaLatin: prev.namaLatin,
+              jumlahAyat: prev.jumlahAyat,
+            }
+          : false,
+        suratSelanjutnya: next
+          ? {
+              nomor: next.nomor,
+              nama: next.nama,
+              namaLatin: next.namaLatin,
+              jumlahAyat: next.jumlahAyat,
+            }
+          : false,
+      };
+
+      detailsByNomor.set(s.nomor, detail);
+      detailsList.push(detail);
+    }
+
+    return { summaries, detailsByNomor, detailsList };
+  })().catch((err) => {
+    datasetPromise = null;
+    throw err;
+  });
+
+  return datasetPromise;
 }
 
 export async function fetchSurahList(): Promise<SurahSummary[]> {
-  const cached = await getCachedSurahList();
-  if (cached && cached.length === 114) {
-    // Refresh quietly in background when online
-    if (typeof navigator === 'undefined' || navigator.onLine) {
-      fetch(`${API_BASE}/surat`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((res: ApiResponse<SurahSummary[]> | null) => {
-          if (res?.code === 200 && Array.isArray(res.data) && res.data.length === 114) {
-            saveSurahList(res.data);
-          }
-        })
-        .catch(() => {});
-    }
-    return cached;
-  }
-
-  const response = await fetch(`${API_BASE}/surat`);
-  if (!response.ok) {
-    throw new Error('Gagal memuat daftar surat Al-Qur\'an.');
-  }
-  const json = (await response.json()) as ApiResponse<SurahSummary[]>;
-  if (json.code !== 200 || !Array.isArray(json.data)) {
-    throw new Error('Format data daftar surat tidak valid.');
-  }
-  await saveSurahList(json.data);
-  return json.data;
+  const ds = await loadLocalDataset();
+  return ds.summaries;
 }
 
 export async function fetchSurahDetail(nomor: number): Promise<SurahDetail> {
-  const cached = await getCachedSurahDetail(nomor);
-  if (cached && Array.isArray(cached.ayat) && cached.ayat.length > 0) {
-    return cached;
+  const ds = await loadLocalDataset();
+  const detail = ds.detailsByNomor.get(nomor);
+  if (!detail) {
+    throw new Error(`Surat ke-${nomor} tidak ditemukan di bundel lokal.`);
   }
-
-  const response = await fetch(`${API_BASE}/surat/${nomor}`);
-  if (!response.ok) {
-    throw new Error(`Gagal memuat Surat ke-${nomor}. Periksa koneksi internet Anda.`);
-  }
-  const json = (await response.json()) as ApiResponse<SurahDetail>;
-  if (json.code !== 200 || !json.data) {
-    throw new Error(`Data Surat ke-${nomor} tidak ditemukan.`);
-  }
-  await saveSurahDetail(json.data);
-  return json.data;
-}
-
-export async function syncAllSurahs(
-  onProgress?: (cachedCount: number, total: number) => void,
-  signal?: AbortSignal,
-): Promise<{ cachedCount: number; failed: number }> {
-  const existingKeys = new Set(await getCachedSurahKeys());
-  let completed = existingKeys.size;
-  onProgress?.(completed, 114);
-
-  const missing: number[] = [];
-  for (let i = 1; i <= 114; i++) {
-    if (!existingKeys.has(i)) missing.push(i);
-  }
-
-  if (missing.length === 0) {
-    return { cachedCount: 114, failed: 0 };
-  }
-
-  let failed = 0;
-  const CONCURRENCY = 6;
-  let cursor = 0;
-
-  async function worker() {
-    while (cursor < missing.length) {
-      if (signal?.aborted) return;
-      const num = missing[cursor++];
-      try {
-        const resp = await fetch(`${API_BASE}/surat/${num}`, { signal });
-        if (resp.ok) {
-          const json = (await resp.json()) as ApiResponse<SurahDetail>;
-          if (json.code === 200 && json.data) {
-            await saveSurahDetail(json.data);
-            completed++;
-            onProgress?.(completed, 114);
-          } else {
-            failed++;
-          }
-        } else {
-          failed++;
-        }
-      } catch (err) {
-        if ((err as Error)?.name === 'AbortError') return;
-        failed++;
-      }
-    }
-  }
-
-  const workers = Array.from({ length: Math.min(CONCURRENCY, missing.length) }, () => worker());
-  await Promise.all(workers);
-
-  const finalKeys = await getCachedSurahKeys();
-  return { cachedCount: finalKeys.length, failed };
+  return detail;
 }
 
 export function normalizeLatinText(input: string): string {
@@ -145,17 +183,14 @@ export async function searchAyahs(
 ): Promise<{
   directJump: { surah: SurahSummary; ayahNumber: number } | null;
   results: SearchResultItem[];
-  searchedSurahCount: number;
 }> {
   const query = rawQuery.trim();
-  const cachedSurahs = await getAllCachedSurahDetails();
-  const searchedSurahCount = cachedSurahs.length;
-
   if (!query) {
-    return { directJump: null, results: [], searchedSurahCount };
+    return { directJump: null, results: [] };
   }
 
-  // 1. Detect direct reference patterns: "2:255", "2 255", "Al-Baqarah 255", "Yasin:1"
+  const ds = await loadLocalDataset();
+
   let directJump: { surah: SurahSummary; ayahNumber: number } | null = null;
   const colonMatch = query.match(/^(\d{1,3})\s*[:.]\s*(\d{1,3})$/);
   if (colonMatch) {
@@ -183,9 +218,8 @@ export async function searchAyahs(
 
   const results: SearchResultItem[] = [];
 
-  // If directJump is matched and that surah is cached, include it at the top
   if (directJump) {
-    const detail = cachedSurahs.find((s) => s.nomor === directJump!.surah.nomor);
+    const detail = ds.detailsByNomor.get(directJump.surah.nomor);
     const ayah = detail?.ayat.find((a) => a.nomorAyat === directJump!.ayahNumber);
     if (detail && ayah) {
       results.push({
@@ -202,10 +236,10 @@ export async function searchAyahs(
   }
 
   if (query.length < 2 && !directJump) {
-    return { directJump, results, searchedSurahCount };
+    return { directJump, results };
   }
 
-  for (const surah of cachedSurahs) {
+  for (const surah of ds.detailsList) {
     for (const ayah of surah.ayat) {
       if (
         directJump &&
@@ -229,8 +263,8 @@ export async function searchAyahs(
         }
       }
 
-      if (scope === 'all' || scope === 'arab') {
-        if (normArabicQuery && normalizeArabicText(ayah.teksArab).includes(normArabicQuery)) {
+      if ((scope === 'all' || scope === 'arab') && normArabicQuery) {
+        if (normalizeArabicText(ayah.teksArab).includes(normArabicQuery)) {
           matchedIn.push('arab');
         }
       }
@@ -247,13 +281,13 @@ export async function searchAyahs(
           matchedIn,
         });
         if (results.length >= limit) {
-          return { directJump, results, searchedSurahCount };
+          return { directJump, results };
         }
       }
     }
   }
 
-  return { directJump, results, searchedSurahCount };
+  return { directJump, results };
 }
 
 export function stripHtmlToText(html: string): string {

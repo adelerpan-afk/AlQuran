@@ -533,11 +533,6 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
               prefs={prefs}
               onUpdatePrefs={onUpdatePrefs}
               onSelectQari={onSelectQari}
-              cachedCount={0}
-              isSyncing={false}
-              syncProgress={{ current: 0, total: 114 }}
-              onStartSync={() => {}}
-              onClearCache={() => {}}
               compactMode
             />
           </div>

@@ -8,12 +8,12 @@ export interface QariOption {
 }
 
 export const QARI_LIST: QariOption[] = [
-  { id: '05', name: 'Mishary Rashid Alafasy', shortName: 'Alafasy', origin: 'Kuwait' },
-  { id: '02', name: 'Abdurrahman As-Sudais', shortName: 'As-Sudais', origin: 'Mekah' },
+  { id: '05', name: 'Misyari Rasyid Al-Afasi', shortName: 'Al-Afasi', origin: 'Kuwait' },
+  { id: '03', name: 'Abdurrahman As-Sudais', shortName: 'As-Sudais', origin: 'Mekah' },
   { id: '01', name: 'Abdullah Al-Juhany', shortName: 'Al-Juhany', origin: 'Mekah' },
-  { id: '04', name: 'Mahmoud Khalil Al-Husary', shortName: 'Al-Husary', origin: 'Mesir' },
-  { id: '03', name: 'Ibrahim Al-Akhdar', shortName: 'Al-Akhdar', origin: 'Madinah' },
-  { id: '06', name: 'Muhammad Ayyub', shortName: 'M. Ayyub', origin: 'Madinah' },
+  { id: '02', name: 'Abdul Muhsin Al-Qasim', shortName: 'Al-Qasim', origin: 'Madinah' },
+  { id: '04', name: 'Ibrahim Al-Dossari', shortName: 'Al-Dossari', origin: 'Riyadh' },
+  { id: '06', name: 'Yasser Al-Dosari', shortName: 'Y. Al-Dosari', origin: 'Mekah' },
 ];
 
 export type AudioMap = Record<QariId, string>;

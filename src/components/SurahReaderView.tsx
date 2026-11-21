@@ -29,6 +29,7 @@ interface SurahReaderViewProps {
   loading: boolean;
   error: string | null;
   focusAyahNumber: number | null;
+  focusNonce?: number;
   prefs: ReaderPreferences;
   audioState: AudioState;
   isBookmarked: (surahNumber: number, ayahNumber: number) => boolean;
@@ -50,6 +51,7 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
   loading,
   error,
   focusAyahNumber,
+  focusNonce,
   prefs,
   audioState,
   isBookmarked,
@@ -80,7 +82,7 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
       }
     }, 120);
     return () => clearTimeout(timer);
-  }, [surah?.nomor, focusAyahNumber]);
+  }, [surah?.nomor, focusAyahNumber, focusNonce]);
 
   // Auto-scroll to currently playing ayah
   useEffect(() => {

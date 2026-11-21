@@ -56,6 +56,7 @@ export default function App() {
   const [focusAyahNumber, setFocusAyahNumber] = useState<number | null>(
     () => lastRead?.ayahNumber ?? null,
   );
+  const [focusNonce, setFocusNonce] = useState(0);
   const [activeSurah, setActiveSurah] = useState<SurahDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -139,6 +140,7 @@ export default function App() {
   const handleOpenSurah = useCallback((nomor: number, ayahNumber?: number) => {
     setSelectedSurahNumber(nomor);
     setFocusAyahNumber(ayahNumber ?? null);
+    setFocusNonce((n) => n + 1);
     setMobileReading(true);
     setActiveTab('surat');
     if (!ayahNumber) {
@@ -153,6 +155,7 @@ export default function App() {
         setSelectedSurahNumber(surahNumber);
         setActiveSurah(detail);
         setFocusAyahNumber(ayahNumber);
+        setFocusNonce((n) => n + 1);
         playAyah(detail, ayahNumber, prefs.qariId);
       } catch {
         // Fallback: open surah so error UI handles it
@@ -323,6 +326,7 @@ export default function App() {
               loading={detailLoading}
               error={detailError}
               focusAyahNumber={focusAyahNumber}
+              focusNonce={focusNonce}
               prefs={prefs}
               audioState={audioState}
               isBookmarked={isBookmarked}
@@ -357,6 +361,7 @@ export default function App() {
               loading={detailLoading}
               error={detailError}
               focusAyahNumber={focusAyahNumber}
+              focusNonce={focusNonce}
               prefs={prefs}
               audioState={audioState}
               isBookmarked={isBookmarked}

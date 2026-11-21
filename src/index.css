@@ -1,0 +1,59 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  html {
+    font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    scroll-behavior: smooth;
+  }
+
+  .dark body {
+    letter-spacing: 0.005em;
+  }
+}
+
+.font-arabic {
+  font-family: 'Amiri', 'Scheherazade New', 'Traditional Arabic', serif;
+  font-feature-settings: 'liga' 1, 'calt' 1, 'kern' 1;
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Custom sleek range input for font sizing & audio scrubbing */
+input[type='range'].quran-range {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type='range'].quran-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background-color: rgba(113, 113, 122, 0.25);
+}
+
+input[type='range'].quran-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  background-color: #0f766e;
+  margin-top: -6px;
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark input[type='range'].quran-range::-webkit-slider-thumb {
+  background-color: #2dd4bf;
+}
+
+input[type='range'].quran-range::-webkit-slider-thumb:active {
+  transform: scale(1.15);
+}

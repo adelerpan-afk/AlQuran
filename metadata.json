@@ -1,0 +1,6 @@
+{
+  "name": "Al-Qur'an Digital",
+  "description": "Aplikasi Al-Qur'an mobile-first lengkap dengan tulisan Arab, transliterasi Latin, terjemahan bahasa Indonesia, pencarian ayat, dan audio murottal multi-Qari.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

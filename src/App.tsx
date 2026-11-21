@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { BookOpen, History, Info, Maximize2, Moon, Search, Settings, Sun } from 'lucide-react';
 import { registerSW } from 'virtual:pwa-register';
 import { AboutView } from './components/AboutView';
@@ -92,6 +93,9 @@ export default function App() {
           })
           .catch(() => {});
       }
+      return;
+    }
+    if (Capacitor.isNativePlatform()) {
       return;
     }
     try {

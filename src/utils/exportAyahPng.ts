@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+
 export interface ExportAyahPngOptions {
   surahName: string;
   surahNumber: number;
@@ -109,6 +111,24 @@ export async function exportAyahAsTransparentPng({
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
     const fileName = `qs-${surahNumber}-${slug || 'ayat'}-ayat-${ayahNumber}.png`;
+
+    if (Capacitor.isNativePlatform() && typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        const file = new File([blob], fileName, { type: 'image/png' });
+        const canShareFiles =
+          typeof navigator.canShare === 'function' ? navigator.canShare({ files: [file] }) : true;
+        if (canShareFiles) {
+          await navigator.share({
+            files: [file],
+            title: `QS. ${surahName} (${surahNumber}) : Ayat ${ayahNumber}`,
+          });
+          return true;
+        }
+      } catch {
+        // User canceled share or WebView share unsupported; fall back to download
+      }
+    }
+
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

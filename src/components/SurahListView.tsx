@@ -134,7 +134,7 @@ export const SurahListView: React.FC<SurahListViewProps> = ({
           <button
             type="button"
             onClick={() => setViewMode('surat')}
-            className={`min-h-[40px] px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
+            className={`min-h-[40px] px-2 sm:px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
               viewMode === 'surat'
                 ? 'bg-white dark:bg-zinc-800 text-teal-700 dark:text-teal-400 shadow-xs'
                 : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
@@ -145,7 +145,7 @@ export const SurahListView: React.FC<SurahListViewProps> = ({
           <button
             type="button"
             onClick={() => setViewMode('juz')}
-            className={`min-h-[40px] px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
+            className={`min-h-[40px] px-2 sm:px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
               viewMode === 'juz'
                 ? 'bg-white dark:bg-zinc-800 text-teal-700 dark:text-teal-400 shadow-xs'
                 : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
@@ -166,7 +166,7 @@ export const SurahListView: React.FC<SurahListViewProps> = ({
                   key={item}
                   type="button"
                   onClick={() => setOrigin(item)}
-                  className={`min-h-[38px] px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 ${
+                  className={`min-h-[40px] px-2 sm:px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
                     active
                       ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs'
                       : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
@@ -349,7 +349,7 @@ export const SurahListView: React.FC<SurahListViewProps> = ({
                           key={`${group.juz}-${entry.surah.nomor}`}
                           type="button"
                           onClick={() => onSelectSurah(entry.surah.nomor, entry.startAyat)}
-                          className={`w-full text-left pl-7 pr-4 py-3 min-h-[56px] flex items-center justify-between gap-3 transition-colors ${
+                          className={`w-full text-left pl-5 sm:pl-7 pr-3.5 sm:pr-4 py-3 min-h-[56px] flex items-center justify-between gap-2.5 sm:gap-3 transition-colors ${
                             isActive
                               ? 'bg-teal-50/70 dark:bg-teal-950/40'
                               : 'hover:bg-zinc-100/70 dark:hover:bg-zinc-800/40'

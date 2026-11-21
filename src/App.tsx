@@ -245,11 +245,11 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+    <div className="min-h-dvh flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
       <OfflineIndicator />
 
-      <header className="sticky top-0 z-30 h-13 lg:h-15 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
-        <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 flex items-center justify-between gap-8">
+      <header className="sticky top-0 z-30 h-12 lg:h-15 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
+        <div className="max-w-7xl mx-auto h-full px-3.5 sm:px-6 flex items-center justify-between gap-4 sm:gap-8">
           <button
             type="button"
             onClick={() => {
@@ -300,11 +300,11 @@ export default function App() {
       </header>
 
       <main
-        className={`flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6 ${
-          audioState.active ? 'pb-40 lg:pb-24' : 'pb-24 lg:pb-12'
+        className={`flex-1 w-full max-w-7xl mx-auto px-3.5 sm:px-6 pt-3.5 sm:pt-6 ${
+          audioState.active ? 'pb-48 lg:pb-28' : 'pb-24 lg:pb-12'
         }`}
       >
-        <div className="lg:hidden">
+        <div className="lg:hidden max-w-2xl mx-auto">
           {mobileReading && activeTab === 'surat' ? (
             <SurahReaderView
               surah={activeSurah}
@@ -387,7 +387,7 @@ export default function App() {
         aria-label="Navigasi Utama"
         className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 pb-safe"
       >
-        <div className="grid grid-cols-5 h-14 items-center">
+        <div className="grid grid-cols-5 h-[52px] max-w-2xl mx-auto items-center">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = activeTab === item.key;
@@ -402,13 +402,13 @@ export default function App() {
                     setActiveTab(item.key);
                   }
                 }}
-                className={`h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                className={`h-full min-h-[44px] flex flex-col items-center justify-center gap-0.5 transition-colors ${
                   active
                     ? 'text-teal-700 dark:text-teal-400'
                     : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                 }`}
               >
-                <Icon className={`w-5 h-5 ${active ? 'stroke-[2.2]' : 'stroke-[1.8]'}`} />
+                <Icon className={`w-[19px] h-[19px] ${active ? 'stroke-[2.2]' : 'stroke-[1.8]'}`} />
                 <span className="text-[10px] font-medium tracking-tight leading-none whitespace-nowrap">
                   {item.label}
                 </span>

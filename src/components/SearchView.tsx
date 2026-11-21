@@ -104,7 +104,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
           )}
         </div>
 
-        <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800">
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800">
           {SCOPE_OPTIONS.map((opt) => {
             const active = scope === opt.id;
             return (
@@ -112,7 +112,9 @@ export const SearchView: React.FC<SearchViewProps> = ({
                 key={opt.id}
                 type="button"
                 onClick={() => setScope(opt.id)}
-                className={`min-h-[38px] px-2 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 ${
+                className={`min-h-[40px] px-1.5 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
+                  opt.id === 'terjemahan' ? 'flex-[1.35]' : 'flex-1'
+                } ${
                   active
                     ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs'
                     : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
@@ -201,13 +203,13 @@ export const SearchView: React.FC<SearchViewProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenAyah(item.surahNumber, item.ayahNumber)}
-                    className="text-left min-h-[36px] flex items-center gap-2 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline"
+                    className="text-left min-h-[40px] min-w-0 flex items-center gap-2 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline"
                   >
-                    <span>
+                    <span className="truncate">
                       QS. {item.surahName} · Ayat {item.ayahNumber}
                     </span>
                   </button>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       type="button"
                       onClick={() => onPlaySearchResult(item.surahNumber, item.ayahNumber)}

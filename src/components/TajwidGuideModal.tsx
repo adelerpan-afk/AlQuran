@@ -61,18 +61,18 @@ export const TajwidGuideModal: React.FC<TajwidGuideModalProps> = ({
           </label>
         </div>
 
-        <div className="overflow-y-auto p-5 divide-y divide-zinc-100 dark:divide-zinc-800 space-y-4">
+        <div className="overflow-y-auto p-5 pb-safe divide-y divide-zinc-100 dark:divide-zinc-800 space-y-4">
           {TAJWID_RULES.map((rule, index) => (
             <div key={rule.id} className={index > 0 ? 'pt-4 space-y-2' : 'space-y-2'}>
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
                   <span
                     className={`w-3.5 h-3.5 rounded-sm shrink-0 ${rule.swatchClass}`}
                     aria-hidden="true"
                   />
-                  <h3 className={`text-sm font-semibold ${rule.colorClass}`}>{rule.name}</h3>
+                  <h3 className={`text-sm font-semibold truncate ${rule.colorClass}`}>{rule.name}</h3>
                 </div>
-                <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+                <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 shrink-0 whitespace-nowrap">
                   {rule.duration}
                 </span>
               </div>
@@ -81,14 +81,14 @@ export const TajwidGuideModal: React.FC<TajwidGuideModalProps> = ({
                 {rule.description}
               </p>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
-                <span className="text-zinc-500 dark:text-zinc-400">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-1 text-xs">
+                <span className="text-zinc-500 dark:text-zinc-400 leading-relaxed">
                   Huruf:{' '}
                   <span dir="rtl" className="font-arabic text-base text-zinc-800 dark:text-zinc-200">
                     {rule.letters}
                   </span>
                 </span>
-                <div className="text-right">
+                <div className="text-right self-end sm:self-auto">
                   <span
                     dir="rtl"
                     className="font-arabic text-xl text-zinc-900 dark:text-zinc-100 block"

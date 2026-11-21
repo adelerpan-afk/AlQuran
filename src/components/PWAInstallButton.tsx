@@ -27,12 +27,19 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'c
         onClick={install}
         className={
           variant === 'compact'
-            ? 'inline-flex items-center gap-1.5 min-h-[44px] px-3 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/50 rounded-lg transition-colors whitespace-nowrap shrink-0'
+            ? 'inline-flex items-center gap-1.5 min-h-[44px] px-2.5 sm:px-3 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/50 rounded-xl transition-colors whitespace-nowrap shrink-0'
             : 'w-full min-h-[48px] flex items-center justify-center gap-2 rounded-xl bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 text-white font-medium text-sm px-4 py-2.5 transition-colors active:scale-[0.99]'
         }
       >
         <Download className="w-4 h-4 shrink-0" />
-        <span>Instal Aplikasi</span>
+        {variant === 'compact' ? (
+          <>
+            <span className="sm:hidden">Instal</span>
+            <span className="hidden sm:inline">Instal Aplikasi</span>
+          </>
+        ) : (
+          <span>Instal Aplikasi</span>
+        )}
       </button>
     );
   }
@@ -45,21 +52,28 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'c
           onClick={() => setShowIOSGuide(true)}
           className={
             variant === 'compact'
-              ? 'inline-flex items-center gap-1.5 min-h-[44px] px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors whitespace-nowrap shrink-0'
+              ? 'inline-flex items-center gap-1.5 min-h-[44px] px-2.5 sm:px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors whitespace-nowrap shrink-0'
               : 'w-full min-h-[48px] flex items-center justify-center gap-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium text-sm px-4 py-2.5 transition-colors'
           }
         >
           <Share className="w-4 h-4 shrink-0" />
-          <span>Pasang di iPhone / iPad</span>
+          {variant === 'compact' ? (
+            <>
+              <span className="sm:hidden">Pasang</span>
+              <span className="hidden sm:inline">Pasang di iPhone / iPad</span>
+            </>
+          ) : (
+            <span>Pasang di iPhone / iPad</span>
+          )}
         </button>
 
         {showIOSGuide && (
           <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-4"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4"
             onClick={() => setShowIOSGuide(false)}
           >
             <div
-              className="w-full max-w-sm rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-xl"
+              className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 pb-safe shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between gap-2">

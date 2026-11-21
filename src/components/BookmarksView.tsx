@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bookmark, BookOpen, Clock, History, Trash2 } from 'lucide-react';
 import type { BookmarkItem, LastReadState, ReadingHistoryItem } from '../types/quran';
 
@@ -45,6 +45,23 @@ export const BookmarksView: React.FC<BookmarksViewProps> = ({
   onClearHistory,
 }) => {
   const [subTab, setSubTab] = useState<SavedSubTab>('history');
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const jumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (jumpTimerRef.current) clearTimeout(jumpTimerRef.current);
+    };
+  }, []);
+
+  const triggerOpenAyah = (key: string, surahNumber: number, ayahNumber: number) => {
+    if (jumpTimerRef.current) clearTimeout(jumpTimerRef.current);
+    setPendingKey(key);
+    jumpTimerRef.current = setTimeout(() => {
+      setPendingKey(null);
+      onOpenAyah(surahNumber, ayahNumber);
+    }, 180);
+  };
 
   const historyByYear = useMemo(() => {
     const groups = new Map<number, ReadingHistoryItem[]>();
@@ -108,8 +125,12 @@ export const BookmarksView: React.FC<BookmarksViewProps> = ({
               </h2>
               <button
                 type="button"
-                onClick={() => onOpenAyah(lastRead.surahNumber, lastRead.ayahNumber)}
-                className="w-full text-left rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 hover:border-teal-600/40 dark:hover:border-teal-500/40 transition-colors flex items-center justify-between gap-3"
+                onClick={() => triggerOpenAyah('last-read', lastRead.surahNumber, lastRead.ayahNumber)}
+                className={`w-full text-left rounded-2xl border p-4 transition-colors flex items-center justify-between gap-3 ${
+                  pendingKey === 'last-read'
+                    ? 'border-teal-600 bg-teal-100/80 dark:bg-teal-900/50'
+                    : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-teal-600/40 dark:hover:border-teal-500/40'
+                }`}
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
@@ -170,11 +191,17 @@ export const BookmarksView: React.FC<BookmarksViewProps> = ({
                       {items.map((item) => (
                         <div
                           key={item.id}
-                          className="flex items-center justify-between gap-2 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors"
+                          className={`flex items-center justify-between gap-2 px-4 py-3 transition-colors ${
+                            pendingKey === `hist-${item.id}`
+                              ? 'bg-teal-100/80 dark:bg-teal-900/50'
+                              : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40'
+                          }`}
                         >
                           <button
                             type="button"
-                            onClick={() => onOpenAyah(item.surahNumber, item.ayahNumber)}
+                            onClick={() =>
+                              triggerOpenAyah(`hist-${item.id}`, item.surahNumber, item.ayahNumber)
+                            }
                             className="flex-1 min-w-0 text-left py-0.5"
                           >
                             <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
@@ -223,11 +250,18 @@ export const BookmarksView: React.FC<BookmarksViewProps> = ({
           ) : (
             <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800 overflow-hidden">
               {bookmarks.map((item) => (
-                <div key={item.id} className="p-4 space-y-2">
+                <div
+                  key={item.id}
+                  className={`p-4 space-y-2 transition-colors ${
+                    pendingKey === `bm-${item.id}` ? 'bg-teal-100/80 dark:bg-teal-900/50' : ''
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => onOpenAyah(item.surahNumber, item.ayahNumber)}
+                      onClick={() =>
+                        triggerOpenAyah(`bm-${item.id}`, item.surahNumber, item.ayahNumber)
+                      }
                       className="min-h-[36px] text-left text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline"
                     >
                       QS. {item.surahName} · Ayat {item.ayahNumber}
@@ -235,7 +269,9 @@ export const BookmarksView: React.FC<BookmarksViewProps> = ({
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => onOpenAyah(item.surahNumber, item.ayahNumber)}
+                        onClick={() =>
+                          triggerOpenAyah(`bm-${item.id}`, item.surahNumber, item.ayahNumber)
+                        }
                         className="min-h-[40px] px-2.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                       >
                         Baca

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AudioMode, AudioState, QariId, SurahDetail } from '../types/quran';
+import type { AudioMode, AudioState, QariId, RepeatMode, SurahDetail } from '../types/quran';
+
+const REPEAT_SEQUENCE: RepeatMode[] = ['off', 3, 5, 'infinite'];
 
 const INITIAL_STATE: AudioState = {
   active: false,
@@ -13,6 +15,8 @@ const INITIAL_STATE: AudioState = {
   qariId: '05',
   currentTime: 0,
   duration: 0,
+  repeatMode: 'off',
+  repeatIteration: 1,
   error: null,
 };
 
@@ -95,7 +99,13 @@ export function useAudioPlayer(defaultQariId: QariId) {
   );
 
   const playAyahSequence = useCallback(
-    (surah: SurahDetail, ayahNumber: number, mode: AudioMode, qariOverride?: QariId) => {
+    (
+      surah: SurahDetail,
+      ayahNumber: number,
+      mode: AudioMode,
+      qariOverride?: QariId,
+      repeatIterationOverride?: number,
+    ) => {
       surahRef.current = surah;
       const qari = qariOverride ?? stateRef.current.qariId ?? defaultQariId;
       const targetAyah = surah.ayat.find((a) => a.nomorAyat === ayahNumber);
@@ -111,6 +121,7 @@ export function useAudioPlayer(defaultQariId: QariId) {
         totalAyahs: surah.jumlahAyat,
         ayahNumber,
         qariId: qari,
+        repeatIteration: repeatIterationOverride ?? stateRef.current.repeatIteration,
       });
 
       preloadNextAyah(surah, ayahNumber, qari);
@@ -120,15 +131,14 @@ export function useAudioPlayer(defaultQariId: QariId) {
 
   const playAyah = useCallback(
     (surah: SurahDetail, ayahNumber: number, qariOverride?: QariId) => {
-      playAyahSequence(surah, ayahNumber, 'ayah', qariOverride);
+      playAyahSequence(surah, ayahNumber, 'ayah', qariOverride, 1);
     },
     [playAyahSequence],
   );
 
-  // Play entire surah sequentially ayah-by-ayah so active ayah highlight stays 100% synced
   const playSurahFull = useCallback(
     (surah: SurahDetail, qariOverride?: QariId) => {
-      playAyahSequence(surah, 1, 'surah', qariOverride);
+      playAyahSequence(surah, 1, 'surah', qariOverride, 1);
     },
     [playAyahSequence],
   );
@@ -159,7 +169,11 @@ export function useAudioPlayer(defaultQariId: QariId) {
       audioRef.current.removeAttribute('src');
       audioRef.current.load();
     }
-    updateState({ ...INITIAL_STATE, qariId: stateRef.current.qariId });
+    updateState({
+      ...INITIAL_STATE,
+      qariId: stateRef.current.qariId,
+      repeatMode: stateRef.current.repeatMode,
+    });
   }, [updateState]);
 
   const seek = useCallback(
@@ -176,7 +190,13 @@ export function useAudioPlayer(defaultQariId: QariId) {
     const surah = surahRef.current;
     if (!surah || s.ayahNumber === null) return;
     if (s.ayahNumber < surah.jumlahAyat) {
-      playAyahSequence(surah, s.ayahNumber + 1, s.mode, s.qariId);
+      playAyahSequence(
+        surah,
+        s.ayahNumber + 1,
+        s.mode,
+        s.qariId,
+        s.mode === 'ayah' ? 1 : s.repeatIteration,
+      );
     }
   }, [playAyahSequence]);
 
@@ -185,7 +205,13 @@ export function useAudioPlayer(defaultQariId: QariId) {
     const surah = surahRef.current;
     if (!surah || s.ayahNumber === null) return;
     if (s.ayahNumber > 1) {
-      playAyahSequence(surah, s.ayahNumber - 1, s.mode, s.qariId);
+      playAyahSequence(
+        surah,
+        s.ayahNumber - 1,
+        s.mode,
+        s.qariId,
+        s.mode === 'ayah' ? 1 : s.repeatIteration,
+      );
     }
   }, [playAyahSequence]);
 
@@ -195,10 +221,22 @@ export function useAudioPlayer(defaultQariId: QariId) {
       const surah = surahRef.current;
       updateState({ qariId: newQariId });
       if (!s.active || !surah || s.ayahNumber === null) return;
-      playAyahSequence(surah, s.ayahNumber, s.mode, newQariId);
+      playAyahSequence(surah, s.ayahNumber, s.mode, newQariId, s.repeatIteration);
     },
     [playAyahSequence, updateState],
   );
+
+  const cycleRepeatMode = useCallback(() => {
+    updateState((prev) => {
+      const idx = REPEAT_SEQUENCE.indexOf(prev.repeatMode);
+      const nextMode = REPEAT_SEQUENCE[(idx + 1) % REPEAT_SEQUENCE.length];
+      return {
+        ...prev,
+        repeatMode: nextMode,
+        repeatIteration: 1,
+      };
+    });
+  }, [updateState]);
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -227,10 +265,38 @@ export function useAudioPlayer(defaultQariId: QariId) {
     const onEnded = () => {
       const s = stateRef.current;
       const surah = surahRef.current;
-      if (surah && s.ayahNumber !== null && s.ayahNumber < surah.jumlahAyat) {
-        playAyahSequence(surah, s.ayahNumber + 1, s.mode, s.qariId);
+      if (!surah || s.ayahNumber === null) {
+        updateState({ isPlaying: false, currentTime: 0, repeatIteration: 1 });
+        return;
+      }
+
+      const shouldRepeatCurrent =
+        s.repeatMode === 'infinite' ||
+        (typeof s.repeatMode === 'number' && s.repeatIteration < s.repeatMode);
+
+      if (s.mode === 'ayah') {
+        if (shouldRepeatCurrent) {
+          const nextIter = s.repeatIteration + 1;
+          updateState({ repeatIteration: nextIter, currentTime: 0, isPlaying: true });
+          audio.currentTime = 0;
+          audio.play().catch(() => updateState({ isPlaying: false }));
+          return;
+        }
+        if (s.ayahNumber < surah.jumlahAyat) {
+          playAyahSequence(surah, s.ayahNumber + 1, 'ayah', s.qariId, 1);
+        } else {
+          updateState({ isPlaying: false, currentTime: 0, repeatIteration: 1 });
+        }
+        return;
+      }
+
+      // Mode 'surah': advance sequentially through all ayahs, then repeat whole surah if configured
+      if (s.ayahNumber < surah.jumlahAyat) {
+        playAyahSequence(surah, s.ayahNumber + 1, 'surah', s.qariId, s.repeatIteration);
+      } else if (shouldRepeatCurrent) {
+        playAyahSequence(surah, 1, 'surah', s.qariId, s.repeatIteration + 1);
       } else {
-        updateState({ isPlaying: false, currentTime: 0 });
+        updateState({ isPlaying: false, currentTime: 0, repeatIteration: 1 });
       }
     };
 
@@ -278,5 +344,6 @@ export function useAudioPlayer(defaultQariId: QariId) {
     nextAyah,
     prevAyah,
     switchQari,
+    cycleRepeatMode,
   };
 }

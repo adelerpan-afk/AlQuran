@@ -87,6 +87,8 @@ export interface ReaderPreferences {
 
 export type AudioMode = 'ayah' | 'surah';
 
+export type RepeatMode = 'off' | 3 | 5 | 'infinite';
+
 export interface AudioState {
   active: boolean;
   isPlaying: boolean;
@@ -95,11 +97,19 @@ export interface AudioState {
   surahNumber: number;
   surahName: string;
   totalAyahs: number;
-  ayahNumber: number | null; // null when mode === 'surah'
+  ayahNumber: number | null;
   qariId: QariId;
   currentTime: number;
   duration: number;
+  repeatMode: RepeatMode;
+  repeatIteration: number;
   error: string | null;
+}
+
+export interface AsbabunNuzulEntry {
+  title: string;
+  narration: string;
+  source: string;
 }
 
 export interface SearchResultItem {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Play, Search, X } from 'lucide-react';
 import { searchAyahs, type SearchScope } from '../services/quranApi';
 import type { SearchResultItem, SurahSummary } from '../types/quran';
@@ -28,6 +28,23 @@ export const SearchView: React.FC<SearchViewProps> = ({
     null,
   );
   const [searching, setSearching] = useState(false);
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const jumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (jumpTimerRef.current) clearTimeout(jumpTimerRef.current);
+    };
+  }, []);
+
+  const triggerOpenAyah = (key: string, surahNumber: number, ayahNumber: number) => {
+    if (jumpTimerRef.current) clearTimeout(jumpTimerRef.current);
+    setPendingKey(key);
+    jumpTimerRef.current = setTimeout(() => {
+      setPendingKey(null);
+      onOpenAyah(surahNumber, ayahNumber);
+    }, 180);
+  };
 
   useEffect(() => {
     let active = true;
@@ -131,8 +148,14 @@ export const SearchView: React.FC<SearchViewProps> = ({
       {directJump && (
         <button
           type="button"
-          onClick={() => onOpenAyah(directJump.surah.nomor, directJump.ayahNumber)}
-          className="w-full text-left rounded-2xl border border-teal-600/30 dark:border-teal-500/30 bg-teal-50/70 dark:bg-teal-950/30 p-4 flex items-center justify-between gap-3 hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-colors"
+          onClick={() =>
+            triggerOpenAyah('direct-jump', directJump.surah.nomor, directJump.ayahNumber)
+          }
+          className={`w-full text-left rounded-2xl border p-4 flex items-center justify-between gap-3 transition-colors ${
+            pendingKey === 'direct-jump'
+              ? 'border-teal-600 bg-teal-100/80 dark:bg-teal-900/50'
+              : 'border-teal-600/30 dark:border-teal-500/30 bg-teal-50/70 dark:bg-teal-950/30 hover:bg-teal-50 dark:hover:bg-teal-950/50'
+          }`}
         >
           <div>
             <p className="text-xs font-medium text-teal-800 dark:text-teal-300">
@@ -194,39 +217,46 @@ export const SearchView: React.FC<SearchViewProps> = ({
             Menampilkan {results.length} hasil{results.length >= 60 ? ' teratas' : ''}
           </p>
           <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800 overflow-hidden">
-            {results.map((item) => (
-              <div
-                key={`${item.surahNumber}:${item.ayahNumber}`}
-                className="p-4 space-y-2.5 hover:bg-zinc-50/70 dark:hover:bg-zinc-800/30 transition-colors"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onOpenAyah(item.surahNumber, item.ayahNumber)}
-                    className="text-left min-h-[40px] min-w-0 flex items-center gap-2 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline"
-                  >
-                    <span className="truncate">
-                      QS. {item.surahName} · Ayat {item.ayahNumber}
-                    </span>
-                  </button>
-                  <div className="flex items-center gap-1 shrink-0">
+            {results.map((item) => {
+              const rowKey = `${item.surahNumber}:${item.ayahNumber}`;
+              const isPending = pendingKey === rowKey;
+              return (
+                <div
+                  key={rowKey}
+                  className={`p-4 space-y-2.5 transition-colors ${
+                    isPending
+                      ? 'bg-teal-100/80 dark:bg-teal-900/50'
+                      : 'hover:bg-zinc-50/70 dark:hover:bg-zinc-800/30'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => onPlaySearchResult(item.surahNumber, item.ayahNumber)}
-                      aria-label={`Putar audio ${item.surahName} ayat ${item.ayahNumber}`}
-                      className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-teal-700 dark:hover:text-teal-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                      onClick={() => triggerOpenAyah(rowKey, item.surahNumber, item.ayahNumber)}
+                      className="text-left min-h-[40px] min-w-0 flex items-center gap-2 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline"
                     >
-                      <Play className="w-4 h-4" />
+                      <span className="truncate">
+                        QS. {item.surahName} · Ayat {item.ayahNumber}
+                      </span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onOpenAyah(item.surahNumber, item.ayahNumber)}
-                      className="min-h-[40px] px-2.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                    >
-                      Buka
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => onPlaySearchResult(item.surahNumber, item.ayahNumber)}
+                        aria-label={`Putar audio ${item.surahName} ayat ${item.ayahNumber}`}
+                        className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-teal-700 dark:hover:text-teal-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                      >
+                        <Play className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => triggerOpenAyah(rowKey, item.surahNumber, item.ayahNumber)}
+                        className="min-h-[40px] px-2.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                      >
+                        Buka
+                      </button>
+                    </div>
                   </div>
-                </div>
 
                 <p
                   dir="rtl"
@@ -239,11 +269,12 @@ export const SearchView: React.FC<SearchViewProps> = ({
                   {highlightText(item.teksLatin, query)}
                 </p>
 
-                <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-                  {highlightText(item.teksIndonesia, query)}
-                </p>
-              </div>
-            ))}
+                  <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+                    {highlightText(item.teksIndonesia, query)}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

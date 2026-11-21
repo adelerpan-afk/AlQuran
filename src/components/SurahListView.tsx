@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, ChevronDown, ChevronRight, Search, X } from 'lucide-react';
 import { buildJuzGroups } from '../data/juzData';
 import type { LastReadState, SurahSummary } from '../types/quran';
@@ -29,6 +29,23 @@ export const SurahListView: React.FC<SurahListViewProps> = ({
   const [query, setQuery] = useState('');
   const [origin, setOrigin] = useState<OriginFilter>('semua');
   const [expandedJuz, setExpandedJuz] = useState<number | null>(1);
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const selectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (selectTimerRef.current) clearTimeout(selectTimerRef.current);
+    };
+  }, []);
+
+  const triggerSelect = (key: string, nomor: number, ayahNumber?: number) => {
+    if (selectTimerRef.current) clearTimeout(selectTimerRef.current);
+    setPendingKey(key);
+    selectTimerRef.current = setTimeout(() => {
+      setPendingKey(null);
+      onSelectSurah(nomor, ayahNumber);
+    }, 180);
+  };
 
   const filteredSurahs = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -81,8 +98,12 @@ export const SurahListView: React.FC<SurahListViewProps> = ({
       {lastRead && (
         <button
           type="button"
-          onClick={() => onSelectSurah(lastRead.surahNumber, lastRead.ayahNumber)}
-          className="w-full text-left rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 hover:border-teal-600/40 dark:hover:border-teal-500/40 transition-colors flex items-center justify-between gap-3 group"
+          onClick={() => triggerSelect('last-read', lastRead.surahNumber, lastRead.ayahNumber)}
+          className={`w-full text-left rounded-2xl border p-4 transition-colors flex items-center justify-between gap-3 group ${
+            pendingKey === 'last-read'
+              ? 'border-teal-600/60 bg-teal-50/80 dark:bg-teal-950/45'
+              : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-teal-600/40 dark:hover:border-teal-500/40'
+          }`}
         >
           <div className="min-w-0">
             <p className="text-xs font-medium text-teal-700 dark:text-teal-400">
@@ -225,14 +246,18 @@ export const SurahListView: React.FC<SurahListViewProps> = ({
       {!loading && !error && viewMode === 'surat' && filteredSurahs.length > 0 && (
         <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800/80 overflow-hidden">
           {filteredSurahs.map((surah) => {
-            const isActive = activeSurahNumber === surah.nomor;
+            const rowKey = `surah-${surah.nomor}`;
+            const isPending = pendingKey === rowKey;
+            const isActive = isPending || (!pendingKey && activeSurahNumber === surah.nomor);
             return (
               <button
                 key={surah.nomor}
                 type="button"
-                onClick={() => onSelectSurah(surah.nomor)}
+                onClick={() => triggerSelect(rowKey, surah.nomor)}
                 className={`w-full text-left px-4 py-3.5 min-h-[64px] flex items-center justify-between gap-3 transition-colors ${
-                  isActive
+                  isPending
+                    ? 'bg-teal-100/80 dark:bg-teal-900/50'
+                    : isActive
                     ? 'bg-teal-50/70 dark:bg-teal-950/40'
                     : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
                 }`}
@@ -343,14 +368,19 @@ export const SurahListView: React.FC<SurahListViewProps> = ({
                 {isExpanded && (
                   <div className="bg-zinc-50/70 dark:bg-zinc-950/40 border-t border-zinc-100 dark:border-zinc-800/80 divide-y divide-zinc-100 dark:divide-zinc-800/70">
                     {entriesToShow.map((entry) => {
-                      const isActive = activeSurahNumber === entry.surah.nomor;
+                      const entryKey = `juz-${group.juz}-${entry.surah.nomor}`;
+                      const isPending = pendingKey === entryKey;
+                      const isActive =
+                        isPending || (!pendingKey && activeSurahNumber === entry.surah.nomor);
                       return (
                         <button
                           key={`${group.juz}-${entry.surah.nomor}`}
                           type="button"
-                          onClick={() => onSelectSurah(entry.surah.nomor, entry.startAyat)}
+                          onClick={() => triggerSelect(entryKey, entry.surah.nomor, entry.startAyat)}
                           className={`w-full text-left pl-5 sm:pl-7 pr-3.5 sm:pr-4 py-3 min-h-[56px] flex items-center justify-between gap-2.5 sm:gap-3 transition-colors ${
-                            isActive
+                            isPending
+                              ? 'bg-teal-100/80 dark:bg-teal-900/50'
+                              : isActive
                               ? 'bg-teal-50/70 dark:bg-teal-950/40'
                               : 'hover:bg-zinc-100/70 dark:hover:bg-zinc-800/40'
                           }`}

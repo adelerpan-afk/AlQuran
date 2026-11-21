@@ -47,6 +47,7 @@ export default function App() {
     nextAyah,
     prevAyah,
     switchQari,
+    cycleRepeatMode,
   } = useAudioPlayer(prefs.qariId);
 
   const [hasEntered, setHasEntered] = useState(false);
@@ -374,6 +375,7 @@ export default function App() {
         onNextAyah={nextAyah}
         onPrevAyah={prevAyah}
         onSwitchQari={handleSelectQari}
+        onCycleRepeat={cycleRepeatMode}
       />
 
       <TajwidGuideModal

@@ -6,25 +6,34 @@ import {
   Bookmark,
   BookOpenCheck,
   Check,
+  ChevronUp,
   Copy,
-  Info,
+  HelpCircle,
+  ImageDown,
   List,
-  Palette,
   Pause,
   Play,
+  ScrollText,
   SlidersHorizontal,
   Volume2,
   X,
 } from 'lucide-react';
+import {
+  getAsbabunNuzulKey,
+  loadAsbabunNuzulMap,
+  type AsbabunNuzulMap,
+} from '../services/asbabunNuzul';
 import { stripHtmlToText } from '../services/quranApi';
 import {
   QARI_LIST,
+  type AsbabunNuzulEntry,
   type AudioState,
   type Ayat,
   type QariId,
   type ReaderPreferences,
   type SurahDetail,
 } from '../types/quran';
+import { exportAyahAsTransparentPng } from '../utils/exportAyahPng';
 import { SettingsView } from './SettingsView';
 import { TajwidGuideModal } from './TajwidGuideModal';
 import { TajwidText } from './TajwidText';
@@ -73,24 +82,48 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
   onMarkLastRead,
 }) => {
   const [showInfo, setShowInfo] = useState(false);
+  const [showAudioControls, setShowAudioControls] = useState(false);
   const [showDisplaySheet, setShowDisplaySheet] = useState(false);
   const [showTajwidGuide, setShowTajwidGuide] = useState(false);
+  const [selectedAyah, setSelectedAyah] = useState<number | null>(focusAyahNumber ?? null);
   const [copiedAyah, setCopiedAyah] = useState<number | null>(null);
-  const ayahRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const [exportedAyah, setExportedAyah] = useState<number | null>(null);
+  const [asbabunNuzulMap, setAsbabunNuzulMap] = useState<AsbabunNuzulMap>({});
+  const [activeHistoryModal, setActiveHistoryModal] = useState<{
+    ayahNumber: number;
+    entry: AsbabunNuzulEntry;
+  } | null>(null);
 
-  // Scroll smoothly to jumped ayah (from search/bookmark/last-read)
+  const ayahRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const selectTimerRef = useRef<number | null>(null);
+
   useEffect(() => {
-    if (!surah || !focusAyahNumber) return;
-    const timer = setTimeout(() => {
+    loadAsbabunNuzulMap().then(setAsbabunNuzulMap);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (selectTimerRef.current !== null) {
+        window.clearTimeout(selectTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Move highlight first when jumping to a surah/ayah, pause briefly, then smoothly scroll
+  useEffect(() => {
+    if (!surah) return;
+    setSelectedAyah(focusAyahNumber ?? null);
+    if (!focusAyahNumber) return;
+    const timer = window.setTimeout(() => {
       const el = ayahRefs.current[focusAyahNumber];
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-    }, 120);
-    return () => clearTimeout(timer);
+    }, 180);
+    return () => window.clearTimeout(timer);
   }, [surah?.nomor, focusAyahNumber, focusNonce]);
 
-  // Auto-scroll to currently playing ayah (both single-ayah and full-surah modes)
+  // Auto-scroll to currently playing ayah
   useEffect(() => {
     if (
       !surah ||
@@ -106,6 +139,21 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
     }
   }, [audioState.active, audioState.surahNumber, audioState.ayahNumber, surah?.nomor]);
 
+  const handleSelectAyah = (ayahNumber: number) => {
+    if (window.getSelection()?.toString()) return;
+    setSelectedAyah(ayahNumber);
+    if (selectTimerRef.current !== null) {
+      window.clearTimeout(selectTimerRef.current);
+    }
+    selectTimerRef.current = window.setTimeout(() => {
+      const el = ayahRefs.current[ayahNumber];
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      selectTimerRef.current = null;
+    }, 180);
+  };
+
   const handleCopyAyah = async (ayah: Ayat) => {
     if (!surah) return;
     const text = [
@@ -118,9 +166,26 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
     try {
       await navigator.clipboard.writeText(text);
       setCopiedAyah(ayah.nomorAyat);
-      setTimeout(() => setCopiedAyah(null), 1800);
+      window.setTimeout(() => setCopiedAyah(null), 1800);
     } catch {
       // Clipboard blocked gracefully
+    }
+  };
+
+  const handleExportPng = async (ayah: Ayat) => {
+    if (!surah) return;
+    try {
+      await exportAyahAsTransparentPng({
+        arabicText: ayah.teksArab,
+        surahName: surah.namaLatin,
+        surahNumber: surah.nomor,
+        ayahNumber: ayah.nomorAyat,
+        theme: prefs.theme,
+      });
+      setExportedAyah(ayah.nomorAyat);
+      window.setTimeout(() => setExportedAyah(null), 1800);
+    } catch {
+      // Ignore canvas/download cancellation errors
     }
   };
 
@@ -180,7 +245,7 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
     <div className="space-y-4">
       {/* Surah Hero Header */}
       <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 sm:p-6">
-        <div className="flex items-start justify-between gap-2 sm:gap-3">
+        <div className="flex items-start justify-between gap-2">
           {onBack ? (
             <button
               type="button"
@@ -191,106 +256,124 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
               <ArrowLeft className="w-5 h-5" />
             </button>
           ) : (
-            <div className="w-11 lg:hidden shrink-0" />
+            <div className="w-11 hidden lg:block shrink-0" />
           )}
 
           <div className="flex-1 min-w-0 text-center">
             <p dir="rtl" className="font-arabic text-3xl sm:text-4xl text-zinc-900 dark:text-zinc-100">
               {surah.nama}
             </p>
-            <h1 className="mt-1 text-lg sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 truncate">
-              {surah.nomor}. {surah.namaLatin}
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
-              {surah.arti} · {surah.tempatTurun} ·{' '}
-              <span className="tabular-nums">{surah.jumlahAyat}</span> Ayat
-            </p>
           </div>
 
           <button
             type="button"
             onClick={() => setShowDisplaySheet(true)}
-            aria-label="Pengaturan tampilan baca"
+            aria-label="Pengaturan tampilan baca dan tajwid"
+            title="Pengaturan tampilan & tajwid"
             className="min-h-[44px] min-w-[44px] -mr-1.5 flex items-center justify-center rounded-xl text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
           >
             <SlidersHorizontal className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Murottal & Reader Controls Bar */}
-        <div className="mt-4 sm:mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5">
-          <div className="flex items-center gap-2 w-full sm:flex-1 sm:min-w-[200px]">
-            <Volume2 className="w-4 h-4 text-zinc-400 shrink-0" />
-            <select
-              aria-label="Pilih Qari Murottal"
-              value={prefs.qariId}
-              onChange={(e) => onSelectQari(e.target.value as QariId)}
-              className="w-full min-h-[44px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/70 px-3 py-1.5 text-xs font-medium text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-teal-600/30"
-            >
-              {QARI_LIST.map((q) => (
-                <option key={q.id} value={q.id}>
-                  Qari: {q.name}
-                </option>
-              ))}
-            </select>
+        {/* Surah Name with Right-Aligned (?) Info Badge + Gap + Speaker Audio Badge */}
+        <div className="mt-2 flex flex-col items-center text-center">
+          <div className="flex items-center justify-center gap-3 max-w-full">
+            <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 truncate">
+              {surah.nomor}. {surah.namaLatin}
+            </h1>
+
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowInfo(true)}
+                aria-label="Informasi tentang surat ini"
+                title="Info surat"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-300 hover:border-teal-600/50 hover:text-teal-700 dark:hover:text-teal-300 transition-colors"
+              >
+                <HelpCircle className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowAudioControls((prev) => !prev)}
+                aria-expanded={showAudioControls}
+                aria-label={
+                  showAudioControls
+                    ? 'Sembunyikan pilihan qari dan putar surat'
+                    : 'Tampilkan pilihan qari dan putar surat'
+                }
+                title="Pilihan Qari & Putar Surat"
+                className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full border transition-colors ${
+                  showAudioControls || isThisSurahFullPlaying
+                    ? 'border-teal-600/60 bg-teal-50 text-teal-700 dark:border-teal-500/60 dark:bg-teal-950/60 dark:text-teal-300'
+                    : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-300 hover:border-teal-600/50 hover:text-teal-700 dark:hover:text-teal-300'
+                }`}
+              >
+                <Volume2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+              </button>
+            </div>
           </div>
 
-          {/* Primary Play Surah CTA: Full-width on mobile, prominent right-aligned on sm+ */}
-          <button
-            type="button"
-            onClick={() =>
-              isThisSurahFullActive ? onTogglePlayPause() : onPlaySurahFull(surah)
-            }
-            className="w-full sm:w-auto sm:order-last min-h-[46px] sm:min-h-[44px] px-4 rounded-xl bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors whitespace-nowrap shrink-0 active:scale-[0.99]"
-          >
-            {isThisSurahFullPlaying ? (
-              <>
-                <Pause className="w-4 h-4" />
-                <span>Jeda Surat</span>
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4" />
-                <span>Putar Surat</span>
-              </>
-            )}
-          </button>
-
-          {/* 3-Column Supporting Controls Grid on Mobile, Inline on sm+ */}
-          <div className="grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex sm:items-center sm:gap-2">
-            <button
-              type="button"
-              onClick={() => onUpdatePrefs({ showTajwid: !prefs.showTajwid })}
-              aria-pressed={prefs.showTajwid}
-              className={`min-h-[44px] px-2 sm:px-3 rounded-xl border text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap ${
-                prefs.showTajwid
-                  ? 'border-teal-600/50 bg-teal-50 text-teal-800 dark:border-teal-500/50 dark:bg-teal-950/50 dark:text-teal-300'
-                  : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-              }`}
-            >
-              <Palette className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span>{prefs.showTajwid ? 'Tajwid: On' : 'Tajwid: Off'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowTajwidGuide(true)}
-              className="min-h-[44px] px-2 sm:px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
-            >
-              <span className="sm:hidden">Panduan</span>
-              <span className="hidden sm:inline">Panduan Tajwid</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowInfo(true)}
-              className="min-h-[44px] px-2 sm:px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
-            >
-              <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span>Info</span>
-            </button>
-          </div>
+          <p className="mt-1.5 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+            {surah.arti} · {surah.tempatTurun} ·{' '}
+            <span className="tabular-nums">{surah.jumlahAyat}</span> Ayat
+          </p>
         </div>
+
+        {/* Collapsible Qari Selector & Play Controls (Hiding never stops audio) */}
+        {showAudioControls && (
+          <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+              <div className="flex items-center gap-2 w-full sm:flex-1 sm:min-w-[200px]">
+                <Volume2 className="w-4 h-4 text-zinc-400 shrink-0" />
+                <select
+                  aria-label="Pilih Qari Murottal"
+                  value={prefs.qariId}
+                  onChange={(e) => onSelectQari(e.target.value as QariId)}
+                  className="w-full min-h-[44px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/70 px-3 py-1.5 text-xs font-medium text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-teal-600/30"
+                >
+                  {QARI_LIST.map((q) => (
+                    <option key={q.id} value={q.id}>
+                      Qari: {q.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-[1fr_auto] sm:flex sm:items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    isThisSurahFullActive ? onTogglePlayPause() : onPlaySurahFull(surah)
+                  }
+                  className="min-h-[44px] px-4 rounded-xl bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors whitespace-nowrap shrink-0 active:scale-[0.99]"
+                >
+                  {isThisSurahFullPlaying ? (
+                    <>
+                      <Pause className="w-4 h-4" />
+                      <span>Jeda Surat</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4" />
+                      <span>Putar Surat</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAudioControls(false)}
+                  className="min-h-[44px] px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+                >
+                  <ChevronUp className="w-4 h-4 shrink-0" />
+                  <span>Sembunyikan</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Basmalah (except Al-Fatihah #1 and At-Taubah #9) */}
@@ -312,9 +395,11 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
             audioState.active &&
             audioState.surahNumber === surah.nomor &&
             audioState.ayahNumber === ayah.nomorAyat;
-          const isFocused = focusAyahNumber === ayah.nomorAyat;
+          const isSelectedAyah = selectedAyah === ayah.nomorAyat;
           const bookmarked = isBookmarked(surah.nomor, ayah.nomorAyat);
           const isLastReadHere = lastReadAyah === ayah.nomorAyat;
+          const historyEntry =
+            asbabunNuzulMap[getAsbabunNuzulKey(surah.nomor, ayah.nomorAyat)];
 
           return (
             <div
@@ -322,20 +407,21 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
               ref={(el) => {
                 ayahRefs.current[ayah.nomorAyat] = el;
               }}
-              className={`p-4 sm:p-6 transition-colors ${
+              onClick={() => handleSelectAyah(ayah.nomorAyat)}
+              className={`p-3.5 sm:p-6 cursor-pointer transition-colors ${
                 isAyahPlaying
-                  ? 'bg-teal-50/80 dark:bg-teal-950/35'
-                  : isFocused
-                  ? 'bg-zinc-50 dark:bg-zinc-800/40'
+                  ? 'bg-teal-50/85 dark:bg-teal-950/40'
+                  : isSelectedAyah
+                  ? 'bg-teal-50/60 dark:bg-teal-950/25'
                   : ''
               }`}
             >
               {/* Ayah Number & Action Bar */}
-              <div className="flex items-center justify-between gap-2 mb-4">
+              <div className="flex items-center justify-between gap-1.5 sm:gap-2 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
                   <span
-                    className={`min-w-[34px] h-[34px] px-2 rounded-lg text-xs font-semibold tabular-nums inline-flex items-center justify-center shrink-0 ${
-                      isAyahPlaying
+                    className={`min-w-[30px] sm:min-w-[34px] h-[30px] sm:h-[34px] px-2 rounded-lg text-xs font-semibold tabular-nums inline-flex items-center justify-center shrink-0 transition-colors ${
+                      isAyahPlaying || isSelectedAyah
                         ? 'bg-teal-700 text-white dark:bg-teal-500 dark:text-zinc-950'
                         : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
                     }`}
@@ -343,7 +429,7 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
                     {ayah.nomorAyat}
                   </span>
                   {isLastReadHere && (
-                    <span className="text-[11px] sm:text-xs font-medium text-teal-700 dark:text-teal-400 truncate">
+                    <span className="hidden sm:inline text-xs font-medium text-teal-700 dark:text-teal-400 truncate">
                       Terakhir dibaca
                     </span>
                   )}
@@ -352,16 +438,21 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
                 <div className="flex items-center gap-0.5 shrink-0">
                   <button
                     type="button"
-                    onClick={() =>
-                      isAyahPlaying ? onTogglePlayPause() : onPlayAyah(surah, ayah.nomorAyat)
-                    }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isAyahPlaying) {
+                        onTogglePlayPause();
+                      } else {
+                        onPlayAyah(surah, ayah.nomorAyat);
+                      }
+                    }}
                     aria-label={
                       isAyahPlaying && audioState.isPlaying
                         ? `Jeda ayat ${ayah.nomorAyat}`
                         : `Putar ayat ${ayah.nomorAyat} (${activeQari.shortName})`
                     }
                     title={`Putar ayat ${ayah.nomorAyat}`}
-                    className={`min-h-[44px] min-w-[40px] sm:min-w-[44px] flex items-center justify-center rounded-xl transition-colors ${
+                    className={`min-h-[40px] sm:min-h-[44px] min-w-[34px] sm:min-w-[42px] flex items-center justify-center rounded-xl transition-colors ${
                       isAyahPlaying
                         ? 'text-teal-700 dark:text-teal-400 bg-teal-100/70 dark:bg-teal-900/40'
                         : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
@@ -376,10 +467,13 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => onMarkLastRead(surah.nomor, surah.namaLatin, ayah.nomorAyat)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMarkLastRead(surah.nomor, surah.namaLatin, ayah.nomorAyat);
+                    }}
                     aria-label={`Tandai ayat ${ayah.nomorAyat} sebagai terakhir dibaca`}
                     title="Tandai terakhir dibaca"
-                    className={`min-h-[44px] min-w-[40px] sm:min-w-[44px] flex items-center justify-center rounded-xl transition-colors ${
+                    className={`min-h-[40px] sm:min-h-[44px] min-w-[34px] sm:min-w-[42px] flex items-center justify-center rounded-xl transition-colors ${
                       isLastReadHere
                         ? 'text-teal-700 dark:text-teal-400'
                         : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
@@ -390,14 +484,17 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => onToggleBookmark(surah.nomor, surah.namaLatin, ayah)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleBookmark(surah.nomor, surah.namaLatin, ayah);
+                    }}
                     aria-label={
                       bookmarked
                         ? `Hapus bookmark ayat ${ayah.nomorAyat}`
                         : `Simpan bookmark ayat ${ayah.nomorAyat}`
                     }
                     title="Bookmark ayat"
-                    className={`min-h-[44px] min-w-[40px] sm:min-w-[44px] flex items-center justify-center rounded-xl transition-colors ${
+                    className={`min-h-[40px] sm:min-h-[44px] min-w-[34px] sm:min-w-[42px] flex items-center justify-center rounded-xl transition-colors ${
                       bookmarked
                         ? 'text-teal-700 dark:text-teal-400'
                         : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
@@ -408,10 +505,48 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => handleCopyAyah(ayah)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleExportPng(ayah);
+                    }}
+                    aria-label={`Simpan ayat ${ayah.nomorAyat} sebagai gambar PNG transparan`}
+                    title="Simpan sebagai PNG transparan"
+                    className="min-h-[40px] sm:min-h-[44px] min-w-[34px] sm:min-w-[42px] flex items-center justify-center rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    {exportedAyah === ayah.nomorAyat ? (
+                      <Check className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                    ) : (
+                      <ImageDown className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  {historyEntry && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveHistoryModal({
+                          ayahNumber: ayah.nomorAyat,
+                          entry: historyEntry,
+                        });
+                      }}
+                      aria-label={`Lihat sejarah turunnya ayat ${ayah.nomorAyat}`}
+                      title="Sejarah turunnya ayat"
+                      className="min-h-[40px] sm:min-h-[44px] min-w-[34px] sm:min-w-[42px] flex items-center justify-center rounded-xl text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-colors"
+                    >
+                      <ScrollText className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopyAyah(ayah);
+                    }}
                     aria-label={`Salin ayat ${ayah.nomorAyat}`}
                     title="Salin ayat"
-                    className="min-h-[44px] min-w-[40px] sm:min-w-[44px] flex items-center justify-center rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    className="min-h-[40px] sm:min-h-[44px] min-w-[34px] sm:min-w-[42px] flex items-center justify-center rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                   >
                     {copiedAyah === ayah.nomorAyat ? (
                       <Check className="w-4 h-4 text-teal-700 dark:text-teal-400" />
@@ -421,6 +556,12 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
                   </button>
                 </div>
               </div>
+
+              {isLastReadHere && (
+                <p className="sm:hidden text-[11px] font-medium text-teal-700 dark:text-teal-400 -mt-2 mb-3">
+                  Terakhir dibaca
+                </p>
+              )}
 
               {/* Arabic Text */}
               <p
@@ -455,22 +596,22 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
         })}
       </div>
 
-      {/* Thumb-Zone Surah Footer Navigation */}
+      {/* Thumb-Zone Surah Footer Navigation (RTL Mushaf Flow: Berikutnya Left, Sebelumnya Right) */}
       <div className="space-y-2.5 pt-1">
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-          {surah.suratSebelumnya ? (
+          {surah.suratSelanjutnya ? (
             <button
               type="button"
               onClick={() => {
-                if (surah.suratSebelumnya) onSelectSurah(surah.suratSebelumnya.nomor);
+                if (surah.suratSelanjutnya) onSelectSurah(surah.suratSelanjutnya.nomor);
               }}
               className="min-h-[56px] rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 sm:px-4 py-3 text-left hover:border-teal-600/40 dark:hover:border-teal-500/40 transition-colors flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4 text-zinc-400 shrink-0" />
               <div className="min-w-0">
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Sebelumnya</p>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Berikutnya</p>
                 <p className="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-                  {surah.suratSebelumnya.namaLatin}
+                  {surah.suratSelanjutnya.namaLatin}
                 </p>
               </div>
             </button>
@@ -478,18 +619,18 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
             <div />
           )}
 
-          {surah.suratSelanjutnya ? (
+          {surah.suratSebelumnya ? (
             <button
               type="button"
               onClick={() => {
-                if (surah.suratSelanjutnya) onSelectSurah(surah.suratSelanjutnya.nomor);
+                if (surah.suratSebelumnya) onSelectSurah(surah.suratSebelumnya.nomor);
               }}
               className="min-h-[56px] rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 sm:px-4 py-3 text-right hover:border-teal-600/40 dark:hover:border-teal-500/40 transition-colors flex items-center justify-end gap-2"
             >
               <div className="min-w-0">
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Berikutnya</p>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Sebelumnya</p>
                 <p className="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-                  {surah.suratSelanjutnya.namaLatin}
+                  {surah.suratSebelumnya.namaLatin}
                 </p>
               </div>
               <ArrowRight className="w-4 h-4 text-zinc-400 shrink-0" />
@@ -553,6 +694,52 @@ export const SurahReaderView: React.FC<SurahReaderViewProps> = ({
             </div>
             <div className="mt-4 space-y-3 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-line">
               {stripHtmlToText(surah.deskripsi)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sejarah Turunnya Ayat (Asbabun Nuzul) Overlay */}
+      {activeHistoryModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4"
+          onClick={() => setActiveHistoryModal(null)}
+        >
+          <div
+            className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 pb-safe sm:p-6 max-h-[84vh] overflow-y-auto shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1.5 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mb-4 sm:hidden" />
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-teal-700 dark:text-teal-400">
+                  Sejarah Turunnya Ayat
+                </p>
+                <h2 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 leading-snug">
+                  {activeHistoryModal.entry.title}
+                </h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  QS. {surah.namaLatin} ({surah.nomor}) · Ayat {activeHistoryModal.ayahNumber}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveHistoryModal(null)}
+                aria-label="Tutup sejarah ayat"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+              <p>{activeHistoryModal.entry.narration}</p>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Sumber: <span className="font-medium text-zinc-700 dark:text-zinc-300">{activeHistoryModal.entry.source}</span>
+              </p>
             </div>
           </div>
         </div>
